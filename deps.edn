@@ -1,0 +1,33 @@
+{:deps    {org.clojure/clojure {:mvn/version "1.10.3"}}
+
+ :paths   ["src"]
+
+ :aliases {:test-coverage {:extra-paths ["test"]
+                           :extra-deps  {lambdaisland/kaocha           {:mvn/version "1.60.972"}
+                                         lambdaisland/kaocha-cloverage {:mvn/version "1.0.75"}
+                                         criterium/criterium           {:mvn/version "0.4.6"}
+                                         io.aviso/pretty               {:mvn/version "1.1"}}
+                           :exec-fn     kaocha.runner/exec-fn
+                           :exec-args   {}}
+
+           :test          {:extra-paths ["test"]
+                           :extra-deps  {io.github.cognitect-labs/test-runner {:git/tag "v0.5.0" :git/sha "b3fd0d2"}
+                                         criterium/criterium                  {:mvn/version "0.4.6"}
+                                         io.aviso/pretty                      {:mvn/version "1.1"}}
+                           :main-opts   ["-m" "cognitect.test-runner"]
+                           :exec-fn     cognitect.test-runner.api/test
+                           :exec-args   {}}
+
+           :profile       {:extra-deps {com.clojure-goes-fast/clj-async-profiler {:mvn/version "0.5.1"}}
+                           :jvm-opts   ["-Djdk.attach.allowAttachSelf" "-XX:+UnlockDiagnosticVMOptions" "-XX:+DebugNonSafepoints"]}
+
+           :jar           {:extra-deps {pack/pack.alpha {:git/url "https://github.com/juxt/pack.alpha.git"
+                                                         :sha     "0e8731e0f24db05b74769e219051b0e92b50624a"}}
+                           :main-opts  ["-m" "mach.pack.alpha.skinny" "--no-libs" "--project-path" "target/out.jar"]}
+
+           :release       {:extra-deps {ivarref/pom-patch {:mvn/version "0.1.16"}}}
+
+           :deploy        {:extra-deps {slipset/deps-deploy {:mvn/version "0.1.3"}}
+                           :main-opts  ["-m" "deps-deploy.deps-deploy" "deploy"
+                                        "target/out.jar" "true"]}}}
+

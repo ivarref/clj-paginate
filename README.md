@@ -12,12 +12,13 @@ Supports:
 
 ## Prerequisites
 
-The users of this library is assumed to be moderately
+The user of this library is assumed to be moderately
 familiar with [GraphQL pagination](https://graphql.org/learn/pagination/)
 and know the basic structure of the 
-[GraphQL Cursor Connections Specification](https://relay.dev/graphql/connections.htm):
+[GraphQL Cursor Connections Specification](https://relay.dev/graphql/connections.htm),
+particularly the fact that the desired response looks like the following:
 
-```json
+```
 {"edges": [{"node": ..., "cursor": ...},
            {"node": ..., "cursor": ...},
            {"node": ..., "cursor": ...},
@@ -30,7 +31,6 @@ and know the basic structure of the
              }
 }
 ```
-
 
 ## Installation
 

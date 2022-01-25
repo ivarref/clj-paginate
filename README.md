@@ -5,8 +5,32 @@ A Clojure implementation of the
 with vector/set as the backing data.
 
 Supports: 
-* Collection that grows and/or changes
-* Polling pagination (`:first` only, not `:last`)
+* Collection that grows and/or changes.
+* Long polling (`:first` only, not `:last`).
+* Filtering and user-defined context.
+* Batching.
+
+## Prerequisites
+
+The users of this library is assumed to be moderately
+familiar with [GraphQL pagination](https://graphql.org/learn/pagination/)
+and know the basic structure of the 
+[GraphQL Cursor Connections Specification](https://relay.dev/graphql/connections.htm):
+
+```json
+{"edges": [{"node": ..., "cursor": ...},
+           {"node": ..., "cursor": ...},
+           {"node": ..., "cursor": ...},
+           ...] 
+ "pageInfo": {"hasNextPage":  Boolean
+              "hasPrevPage":  Boolean
+              "totalCount": Integer
+              "startCursor": String
+              "endCursor": String
+             }
+}
+```
+
 
 ## Installation
 
@@ -59,7 +83,7 @@ Supports:
 ; (nodes page-3)
 ; => []
 ; No more data! 
-; The poller should now sleep for some time before attempting again.
+; The poller, i.e. a different backend, should now sleep for some time before attempting again.
 
 
 ; More data has arrived:
@@ -99,7 +123,7 @@ This library was developed for supporting pagination for "heavy" Datomic queries
 spent too much time on delivering the initial result that would then have to be sorted and
 paginated.
 
-## Basic usage example
+## Basic use case example
 
 You will want to store the result of `cp/prepare-paginate` in an atom, and
 periodically re-generate this value at some fixed interval in a background thread.
@@ -139,7 +163,7 @@ periodically re-generate this value at some fixed interval in a background threa
             http-body)))
 ```
 
-That is all that is needed for the basic usage case to work.
+That is all that is needed for the basic use case to work.
 
 ## Filtering and context
 
@@ -147,12 +171,12 @@ Sometimes you may want to provide dynamic filters on the data.
 This is done in four steps:
 
 1. Your HTTP endpoint must support parameters that represents the filters.
-2. Create the filters based on either the given cursor or the initial query.
-3. Create a filter function based on the filters. Pass this to the paginate function. 
+2. Create the filters based on the initial query or the given cursor.
+3. Create a filter function based on the filters. Pass this to the paginate function using `:filter`. 
 4. Pass `:context` to the paginate function to store the filters in the cursor, 
 i.e. it will be used in subsequent queries.
 
-Let's add a `:status` property to our previous example and make it filterable:
+As an example, let's add a `:status` property to our previous example and make it filterable:
 
 ```clojure
 (require '[com.github.ivarref.clj-paginate :as cp])
@@ -170,8 +194,10 @@ Let's add a `:status` property to our previous example and make it filterable:
   (let [statuses (into #{} (or 
                              ; Prefer the statuses that was stored in the cursor:
                              (:statuses (cp/get-context http-body))
+                             
                              ; Use the specified statuses given on the initial request:
                              (not-empty statuses)
+                             
                              ; Default to include all statuses:
                              [:init :pending :done :error]))]
     (assoc response
@@ -183,7 +209,7 @@ Let's add a `:status` property to our previous example and make it filterable:
                   (Thread/sleep 10) ; do some heavy work
                   (assoc node :value-from-db 1))
                 
-                http-body ; :first or :last and optionally :after or :before
+                http-body ; :first or :last, and optionally :after or :before
                 
                 ; Filter nodes by specifying :filter. 
                 ; Only nodes for which :filter returns truthy is included in the returned edges.
@@ -199,4 +225,28 @@ When subsequent iteration is done, the cursor, `:after` or `:before`,
 already includes `:statuses`, and thus it is not necessary to re-send
 this information on every request.
 
+### Batching
+
+Batching is supported. Add `:batch? true` when calling `paginate`.
+`f` must now accept a vector of nodes, and return 
+a vector of processed nodes. The returned vector *must* have the same
+ordering as the input vector. 
+
+
 ## Performance
+
+
+## License
+
+Copyright © 2022 Ivar Refsdal
+
+This program and the accompanying materials are made available under the
+terms of the Eclipse Public License 2.0 which is available at
+http://www.eclipse.org/legal/epl-2.0.
+
+This Source Code may also be made available under the following Secondary
+Licenses when the conditions for such availability set forth in the Eclipse
+Public License, v. 2.0 are satisfied: GNU General Public License as published by
+the Free Software Foundation, either version 2 of the License, or (at your
+option) any later version, with the GNU Classpath Exception which is available
+at https://www.gnu.org/software/classpath/license.html.

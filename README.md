@@ -27,9 +27,7 @@ particularly the fact that the desired response looks like the following:
               "hasPrevPage":  Boolean
               "totalCount": Integer
               "startCursor": String
-              "endCursor": String
-             }
-}
+              "endCursor": String}}
 ```
 
 ## Installation
@@ -128,6 +126,7 @@ paginated.
 You will want to store the result of `cp/prepare-paginate` in an atom, and
 periodically re-generate this value at some fixed interval in a background thread.
 [Recurring-cup's dereffable job](...) is a good fit for this.
+We will omit this step in the example that follows.
 
 ```clojure
 (require '[com.github.ivarref.clj-paginate :as cp])
@@ -229,11 +228,23 @@ this information on every request.
 
 Batching is supported. Add `:batch? true` when calling `paginate`.
 `f` must now accept a vector of nodes, and return 
-a vector of processed nodes. The returned vector *must* have the same
+a vector of processed nodes. The returned vector must have the same
 ordering as the input vector. 
 
 
 ## Performance
+
+`prepare-paginate` turns the input collection into a binary search tree,
+and thus the general performance is `O(log n)` for finding where to continue
+giving out data.
+However, if `:filter` is used and seldom matches anything, it may very
+well be much worse, `O(n)`. Use `:filter` at your own risk!
+
+Using `:first 1000` and 10 million dummy entries, the average
+overhead was about 10 ms per iteration on my machine. That is about
+10 microseconds per returned node.
+While that is not great, it is not terrible either. 
+About 80% of the time is spent inside `pr-str` printing the cursor.
 
 
 ## License

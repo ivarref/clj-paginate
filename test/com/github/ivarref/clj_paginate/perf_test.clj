@@ -17,3 +17,12 @@
                           (recur (into so-far new-items)))
                         so-far)))]
     (is (= all-items total-vec))))
+
+(comment
+  (do
+    (require '[clj-async-profiler.core :as prof])
+    (prof/profile
+      (clojure.test/test-var #'perftest))))
+
+(comment
+  (prof/serve-files 8080))

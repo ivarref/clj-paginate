@@ -156,9 +156,10 @@ We will omit this step in the example that follows.
               (assoc node :value-from-db 1))
             
             ; The third argument should be a map containing the arguments to the pagination.
-            ; Thus this map should contain either:
+            ; This map must contain either:
             ; :first (Integer), how many items to fetch from the start, and optionally :after, the cursor,
             ; or :last (Integer), how many items to fetch from the end, and optionally :before, the cursor.
+            ; If this requirement is not satisfied, an exception will be thrown.
             http-body)))
 ```
 

@@ -25,9 +25,9 @@ particularly the fact that the desired response looks like the following:
            ...] 
  "pageInfo": {"hasNextPage":  Boolean
               "hasPrevPage":  Boolean
-              "totalCount": Integer
-              "startCursor": String
-              "endCursor": String}}
+              "totalCount":   Integer
+              "startCursor":  String
+              "endCursor":    String}}
 ```
 
 ## Installation

@@ -152,13 +152,13 @@ We will omit this step in the example that follows.
             ; The second argument is a function that further processes the node.
             ; The function may for example load more data from a database or other external storage.
             (fn [{:keys [inst id] :as node}]  
-              (Thread/sleep 10) ; do some heavy work
+              (Thread/sleep 10) ; Do some heavy work.
               (assoc node :value-from-db 1))
             
             ; The third argument should be a map containing the arguments to the pagination.
             ; Thus this map should contain either:
             ; :first (Integer), how many items to fetch from the start, and optionally :after, the cursor,
-            ; or :last (Integer), how many items to fetch from the end, and optionally :before, the cursor
+            ; or :last (Integer), how many items to fetch from the end, and optionally :before, the cursor.
             http-body)))
 ```
 
@@ -205,10 +205,10 @@ As an example, let's add a `:status` property to our previous example and make i
                 my-cache
                 
                 (fn [{:keys [inst id] :as node}]
-                  (Thread/sleep 10) ; do some heavy work
+                  (Thread/sleep 10) ; Do some heavy work.
                   (assoc node :value-from-db 1))
                 
-                http-body ; :first or :last, and optionally :after or :before
+                http-body ; :first or :last, and optionally :after or :before.
                 
                 ; Filter nodes by specifying :filter. 
                 ; Only nodes for which :filter returns truthy is included in the returned edges.
@@ -229,8 +229,28 @@ this information on every request.
 Batching is supported. Add `:batch? true` when calling `paginate`.
 `f` must now accept a vector of nodes, and return 
 a vector of processed nodes. The returned vector must have the same
-ordering as the input vector. 
+ordering as the input vector.  You may want to use the function
+`ensure-order` to make sure the order is correct:
 
+```clojure
+(require '[com.github.ivarref.clj-paginate :as cp])
+
+(defn load-batch [nodes]
+  (let [loaded-nodes (->> nodes
+                          ; Pretend to load data from the database:
+                          (mapv #(assoc % :db/id (:id %)))
+                          ; We got the ordering mixed up:
+                          (shuffle))]
+    (cp/ensure-order nodes 
+                     loaded-nodes
+                     :sif :id ; Source id function, defaults to :id.
+                     :dif :db/id ; Dest id function, defaults to :id.
+                     
+                     ; (sif input-node) must be equal to some (dif output-node).
+                     ; ensure-order uses this to order `loaded-nodes` according
+                     ; to how `nodes` were ordered.
+                     )))
+```
 
 ## Performance
 
@@ -245,7 +265,6 @@ overhead was about 10 ms per iteration on my machine. That is about
 10 microseconds per returned node.
 While that is not great, it is not terrible either. 
 About 80% of the time is spent inside `pr-str` printing the cursor.
-
 
 ## License
 

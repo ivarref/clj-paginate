@@ -13,7 +13,7 @@
         batch-f (fn [nodes]
                   (reset! seen-data nodes)
                   (mapv #(assoc % :new-prop 1) nodes))
-        conn (pv/batch-paginate prep batch-f {:first 5})]
+        conn (pv/paginate prep batch-f {:first 5} :batch? true)]
     (is (= [{:inst 0} {:inst 1} {:inst 2} {:inst 3} {:inst 4}] @seen-data))
     (is (= [{:inst 0, :new-prop 1}
             {:inst 1, :new-prop 1}
@@ -55,7 +55,7 @@
         batch-f (fn [nodes]
                   (reset! seen-data nodes)
                   (mapv #(assoc % :new-prop 1) nodes))
-        conn (pv/batch-paginate prep batch-f {:last 5})]
+        conn (pv/paginate prep batch-f {:last 5} :batch? true)]
     (is (= [{:inst 5} {:inst 6} {:inst 7} {:inst 8} {:inst 9}] @seen-data))
     (is (= [{:inst 5, :new-prop 1}
             {:inst 6, :new-prop 1}

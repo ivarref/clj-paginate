@@ -4,3 +4,4 @@ target/
 *.iml
 .nrepl-port
 .clj-kondo/
+*.pom.asc

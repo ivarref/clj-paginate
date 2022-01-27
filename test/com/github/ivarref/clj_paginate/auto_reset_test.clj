@@ -27,7 +27,8 @@
     (is (= [0 1] (nodes (cp/paginate p2 identity {:first 2 :after (->> conn
                                                                        :edges
                                                                        last
-                                                                       :cursor)}))))))
+                                                                       :cursor)}
+                                     :auto-reset? true))))))
 
 
 (deftest autoreset-last

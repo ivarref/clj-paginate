@@ -58,8 +58,8 @@
            Defaults to false.
 
   :auto-reset?: Whether to detect and automatically reset old cursors.
-                Defaults to true."
-  [prepared f opts & {:keys [filter context batch? auto-reset?] :or {filter (constantly true) context {} batch? false auto-reset? true}}]
+                Defaults to false."
+  [prepared f opts & {:keys [filter context batch? auto-reset?] :or {filter (constantly true) context {} batch? false auto-reset? false}}]
   (assert (fn? f) "Expected f to be a function")
   (assert (fn? filter) "Expected keep? to be a function")
   (assert (map? opts) "Expected opts to be a map")

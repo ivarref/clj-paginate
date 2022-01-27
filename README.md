@@ -276,8 +276,8 @@ getting the data from the beginning again, and not have to be explicitly restart
 and may be set to for example the current git sha.
 Otherwise it defaults to a random UUID.
 
-You may turn off the auto reset feature by specifying `:auto-reset? false`
-when calling `paginate`. By default this feature is enabled.
+You may turn on the auto reset feature by specifying `:auto-reset? true`
+when calling `paginate`. By default this feature is disabled.
 
 
 ## Performance
@@ -290,7 +290,7 @@ well be much worse, `O(n)`. Use `:filter` at your own risk!
 
 Using `:first 1000` and 10 million dummy entries, the average
 overhead was about 1 ms per iteration on my machine. That is about
-1 microseconds per returned node.
+1 microsecond per returned node.
 
 ## License
 

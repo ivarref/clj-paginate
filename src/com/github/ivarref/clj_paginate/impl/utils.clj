@@ -1,11 +1,12 @@
 (ns com.github.ivarref.clj-paginate.impl.utils
   (:require [clojure.edn :as edn]
-            [com.github.ivarref.clj-paginate.impl.bst :as bst])
+            [com.github.ivarref.clj-paginate.impl.bst :as bst]
+            [clojure.string :as str])
   (:import (java.util UUID)
            (java.io StringWriter Writer)))
 
 
-(defonce instance-id (delay (str (UUID/randomUUID))))
+(defonce version (delay (str (UUID/randomUUID))))
 
 
 (defn balanced-tree
@@ -15,20 +16,29 @@
     {:root         (bst/balanced-tree v)
      :input-vector v
      :id           (str (UUID/randomUUID))
-     :instance-id  @instance-id
+     :version      (str (get opts :version @version))
      :opts         {:sort-by srt-by}}))
 
 
 (defn maybe-decode-cursor [cursor]
   (when cursor
-    (when (string? cursor)
+    (when (and (string? cursor)
+               (not-empty cursor)
+               (str/starts-with? cursor "{"))
       (edn/read-string cursor))))
+
+
+(defn old-cursor? [cursor version]
+  (when (map? cursor)
+    (not= version (get cursor :version))))
 
 
 (defn get-cursor [opts]
   (or
     (let [cursor (or (get opts :after) (get opts :before))]
-      (when (and (string? cursor) (not-empty cursor))
+      (when (and (string? cursor)
+                 (not-empty cursor)
+                 (str/starts-with? cursor "{"))
         (edn/read-string cursor)))
     {}))
 

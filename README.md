@@ -1,6 +1,6 @@
 # clj-paginate
 
-A Clojure implementation of the 
+A Clojure (JVM only) implementation of the 
 [GraphQL Cursor Connections Specification](https://relay.dev/graphql/connections.htm) 
 with vector/set as the backing data.
 
@@ -8,7 +8,8 @@ Supports:
 * Collection that grows and/or changes.
 * Long polling (`:first` only, not `:last`).
 * Filtering and user-defined context.
-* Batching.
+* Batching (optional).
+* Automatic reset of old cursors.
 
 ## Prerequisites
 
@@ -257,6 +258,27 @@ ordering as the input vector.  You may want to use the function
                      ; to how `nodes` were ordered.
                      )))
 ```
+
+### Auto reset
+
+Your pagination logic may change from deploy to deploy, and the
+cursor returned may not be backwards compatible.
+But your consumers may keep polling using old cursors.
+
+By default the cursor includes a `:version` field that is a stringified random
+UUID, created at the first invocation of `prepare-paginate`.
+If the field in the cursor does not match with the value held in memory
+by the running backend, `paginate` will start over and ignore the old cursor.
+This means that a consumer polling with an old cursor will simply start
+getting the data from the beginning again, and not have to be explicitly restarted.
+
+`:version` may be specified in the `opts` map when calling `prepare-paginate`,
+and may be set to for example the current git sha.
+Otherwise it defaults to a random UUID.
+
+You may turn off the auto reset feature by specifying `:auto-reset? false`
+when calling `paginate`. By default this feature is enabled.
+
 
 ## Performance
 

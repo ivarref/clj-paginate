@@ -14,9 +14,14 @@
 (defn prepare-paginate
   "Prepares data for pagination. Coll should be a set or a vector.
 
-  Opts must contain :sort-by, which should be a vector of keywords
-  that determine the ordering of coll."
-  [opts coll]
+  Opts must be a map that contains :sort-by, which should be a vector of keywords
+  that determine the ordering of coll.
+
+  Opts may contain a key :version that specifies the version of the running code.
+  This field will be used to detect and reset old cursors.
+  It defaults to a random uuid.
+  You may set it to for example the current git sha."
+  [{:keys [sort-by version] :as opts} coll]
   (u/balanced-tree coll opts))
 
 
@@ -50,15 +55,22 @@
   :batch?: Set to true if f should be invoked once on all nodes,
            and not once for each node. If this is set to true,
            f must return the output nodes in the same order as the input nodes.
-           Defaults to false."
-  [prepared f opts & {:keys [filter context batch?] :or {filter (constantly true) context {} batch? false}}]
+           Defaults to false.
+
+  :auto-reset?: Whether to detect and automatically reset old cursors.
+                Defaults to true."
+  [prepared f opts & {:keys [filter context batch? auto-reset?] :or {filter (constantly true) context {} batch? false auto-reset? true}}]
   (assert (fn? f) "Expected f to be a function")
   (assert (fn? filter) "Expected keep? to be a function")
   (assert (map? opts) "Expected opts to be a map")
   (let [f-map (if batch?
                 {:batch-f f}
                 {:f f})
-        cursor-str (or (get opts :after) (get opts :before))]
+        cursor-str (or (get opts :after) (get opts :before))
+        cursor-str (if (and auto-reset?
+                            (u/old-cursor? (u/maybe-decode-cursor cursor-str) (:version prepared)))
+                     nil
+                     cursor-str)]
     (binding [*print-dup* false
               *print-meta* false
               *print-readably* true

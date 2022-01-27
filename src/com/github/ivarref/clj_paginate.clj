@@ -59,45 +59,51 @@
                 {:batch-f f}
                 {:f f})
         cursor-str (or (get opts :after) (get opts :before))]
-    (cond
-      (and (some? (get opts :first)) (some? (get opts :last)))
-      (throw (ex-info "Both :first and :last given, don't know what to do." {:opts opts}))
+    (binding [*print-dup* false
+              *print-meta* false
+              *print-readably* true
+              *print-length* nil
+              *print-level* nil
+              *print-namespace-maps* false]
+      (cond
+        (and (some? (get opts :first)) (some? (get opts :last)))
+        (throw (ex-info "Both :first and :last given, don't know what to do." {:opts opts}))
 
-      (and (some? (get opts :first)) (some? (get opts :before)))
-      (throw (ex-info ":first and :before given, please use :first with :after" {:opts opts}))
+        (and (some? (get opts :first)) (some? (get opts :before)))
+        (throw (ex-info ":first and :before given, please use :first with :after" {:opts opts}))
 
-      (and (some? (get opts :last)) (some? (get opts :after)))
-      (throw (ex-info ":last and :after given, please use :last with :before" {:opts opts}))
+        (and (some? (get opts :last)) (some? (get opts :after)))
+        (throw (ex-info ":last and :after given, please use :last with :before" {:opts opts}))
 
-      (nil? (:root prepared))
-      {:edges    []
-       :pageInfo {:hasNextPage false
-                  :hasPrevPage false
-                  :startCursor (pr-str {:context context})
-                  :endCursor   (pr-str {:context context})
-                  :totalCount  0}}
+        (nil? (:root prepared))
+        {:edges    []
+         :pageInfo {:hasNextPage false
+                    :hasPrevPage false
+                    :startCursor (pr-str {:context context})
+                    :endCursor   (pr-str {:context context})
+                    :totalCount  0}}
 
-      (false? (bst/node? (:root prepared)))
-      (throw (ex-info "Expected input parameter `prepared` to be of type com.github.ivarref.clj-paginate.impl.bst Node, please use com.github.ivarref.clj-paginate/prepare-paginate" {:prepared prepared}))
+        (false? (bst/node? (:root prepared)))
+        (throw (ex-info "Expected input parameter `prepared` to be of type com.github.ivarref.clj-paginate.impl.bst Node, please use com.github.ivarref.clj-paginate/prepare-paginate" {:prepared prepared}))
 
-      (pos-int? (get opts :first))
-      (pf/paginate-first prepared
-                         (merge f-map
-                                {:max-items (get opts :first)
-                                 :keep?     filter
-                                 :context   context})
-                         cursor-str)
+        (pos-int? (get opts :first))
+        (pf/paginate-first prepared
+                           (merge f-map
+                                  {:max-items (get opts :first)
+                                   :keep?     filter
+                                   :context   context})
+                           cursor-str)
 
-      (pos-int? (get opts :last))
-      (pl/paginate-last prepared
-                        (merge f-map
-                               {:max-items (get opts :last)
-                                :keep?     filter
-                                :context   context})
-                        cursor-str)
+        (pos-int? (get opts :last))
+        (pl/paginate-last prepared
+                          (merge f-map
+                                 {:max-items (get opts :last)
+                                  :keep?     filter
+                                  :context   context})
+                          cursor-str)
 
-      :else
-      (throw (ex-info "Bad opts given, expected either :first or :last to be a positive integer." {:opts opts})))))
+        :else
+        (throw (ex-info "Bad opts given, expected either :first or :last to be a positive integer." {:opts opts}))))))
 
 
 (defn ensure-order [src-vec dst-vec & {:keys [sif dif] :or {sif :id dif :id}}]

@@ -1,7 +1,11 @@
 (ns com.github.ivarref.clj-paginate.impl.utils
   (:require [clojure.edn :as edn]
             [com.github.ivarref.clj-paginate.impl.bst :as bst])
-  (:import (java.util UUID)))
+  (:import (java.util UUID)
+           (java.io StringWriter Writer)))
+
+
+(defonce instance-id (delay (str (UUID/randomUUID))))
 
 
 (defn balanced-tree
@@ -11,6 +15,7 @@
     {:root         (bst/balanced-tree v)
      :input-vector v
      :id           (str (UUID/randomUUID))
+     :instance-id  @instance-id
      :opts         {:sort-by srt-by}}))
 
 
@@ -37,3 +42,19 @@
         keep?
         (fn [_] (swap! cnt inc)))
       @cnt)))
+
+
+(defn cursor-pre [cursor]
+  (let [s (pr-str (dissoc cursor :cursor))
+        s (subs s 0 (dec (count s)))]
+    (str s " :cursor [")))
+
+
+(defn node-cursor [cursor-pre node sort-attrs]
+  (with-open [^Writer sw (StringWriter.)]
+    (.append sw ^String cursor-pre)
+    (doseq [attr sort-attrs]
+      (print-method (get node attr) sw)
+      (.append sw " "))
+    (.append sw "]}")
+    (.toString sw)))

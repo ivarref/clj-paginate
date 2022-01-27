@@ -121,12 +121,17 @@ This library was developed for supporting pagination for "heavy" Datomic queries
 spent too much time on delivering the initial result that would then have to be sorted and
 paginated.
 
-## Basic use case example
+## Intended usage
 
-You will want to store the result of `cp/prepare-paginate` in an atom, and
+You will want to store the result of `cp/prepare-paginate` in an atom, as this is
+a somewhat expensive function, and
 periodically re-generate this value at some fixed interval in a background thread.
 [Recurring-cup's dereffable job](...) is a good fit for this.
-We will omit this step in the example that follows.
+
+We will omit this step in the examples that follows.
+
+
+## Basic use case example
 
 ```clojure
 (require '[com.github.ivarref.clj-paginate :as cp])
@@ -262,10 +267,8 @@ However, if `:filter` is used and seldom matches anything, it may very
 well be much worse, `O(n)`. Use `:filter` at your own risk!
 
 Using `:first 1000` and 10 million dummy entries, the average
-overhead was about 10 ms per iteration on my machine. That is about
-10 microseconds per returned node.
-While that is not great, it is not terrible either. 
-About 80% of the time is spent inside `pr-str` printing the cursor.
+overhead was about 1 ms per iteration on my machine. That is about
+1 microseconds per returned node.
 
 ## License
 

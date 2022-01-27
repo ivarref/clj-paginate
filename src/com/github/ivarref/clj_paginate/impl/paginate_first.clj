@@ -3,7 +3,7 @@
             [com.github.ivarref.clj-paginate.impl.utils :as u]))
 
 
-(defn paginate-first [{:keys [root id opts]}
+(defn paginate-first [{:keys [root id opts instance-id]}
                       {:keys [max-items
                               f
                               batch-f
@@ -18,17 +18,18 @@
         org-cursor cursor
         decoded-cursor (u/maybe-decode-cursor cursor)
         cursor (-> (merge {:context context} decoded-cursor)
-                   (assoc :id id)
+                   (assoc :id id :instance-id instance-id)
                    (update :totalCount (partial u/get-total-count root keep? id decoded-cursor)))
         nodes-plus-1 (if-let [from-value (get cursor :cursor)]
-                       (bst/after-value root keep? from-value sort-attrs (inc max-items))
+                       (bst/after-value root keep? (zipmap sort-attrs from-value) sort-attrs (inc max-items))
                        (bst/from-beginning root keep? (inc max-items)))
         nodes (if-let [nodes (not-empty (take max-items nodes-plus-1))]
                 (vec (batch-f (vec nodes)))
                 [])
+        cursor-pre (u/cursor-pre cursor)
         edges (mapv (fn [node]
                       {:node   (f node)
-                       :cursor (pr-str (assoc cursor :cursor (select-keys node sort-attrs)))})
+                       :cursor (u/node-cursor cursor-pre node sort-attrs)})
                     nodes)
         hasPrevPage (or (when (not-empty nodes-plus-1)
                           (not= (first nodes-plus-1)

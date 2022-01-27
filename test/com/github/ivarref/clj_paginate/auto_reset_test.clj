@@ -44,4 +44,5 @@
     (is (= [2 3] (nodes (cp/paginate p2 identity {:last 2 :before (->> conn
                                                                        :edges
                                                                        first
-                                                                       :cursor)}))))))
+                                                                       :cursor)}
+                                     :auto-reset? true))))))

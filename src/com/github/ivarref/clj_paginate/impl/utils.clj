@@ -43,15 +43,29 @@
     {}))
 
 
+(defonce constantly-true (constantly true))
+
+
 (defn get-total-count [root keep? id decoded-cursor old-count]
-  (if (and old-count (= id (:id decoded-cursor)))
-    old-count
-    (let [cnt (atom 0)]
-      (bst/visit-all-depth-first
-        root
-        keep?
-        (fn [_] (swap! cnt inc)))
-      @cnt)))
+  (when root
+    (cond
+      (= keep? constantly-true)
+      (count (.-v root))
+
+      (and old-count (= id (:id decoded-cursor)))
+      old-count
+
+      :else
+      (let [v (.-v root)]
+        (loop [i 0
+               cnt 0]
+          (if (= i (count v))
+            cnt
+            (recur (inc i)
+                   (+ cnt
+                      (if (keep? (nth v i))
+                        1
+                        0)))))))))
 
 
 (defn cursor-pre [cursor]
@@ -71,13 +85,18 @@
 
 
 (defn get-edges [nodes batch-f f sort-attrs cursor]
-  (let [nodes (vec nodes)
-        cursor-pre-str (cursor-pre cursor)
-        batch-nodes (if (not-empty nodes)
-                      (batch-f nodes)
-                      [])]
-    (mapv (fn [org-node batch-node]
-            {:node   (f batch-node)
-             :cursor (node-cursor cursor-pre-str org-node sort-attrs)})
-          nodes
-          batch-nodes)))
+  (let [nodes (vec nodes)]
+    (if (empty? nodes)
+      []
+      (let [cursor-pre-str (cursor-pre cursor)
+            batch-nodes (batch-f nodes)]
+        (loop [i 0
+               res (transient [])]
+          (if (= i (count nodes))
+             (persistent! res)
+             (recur (inc i)
+                    (conj! res
+                           {:node (f (nth batch-nodes i))
+                            :cursor (node-cursor cursor-pre-str
+                                                 (nth nodes i)
+                                                 sort-attrs)}))))))))

@@ -12,7 +12,7 @@
                        :or   {f       identity
                               batch-f identity
                               context nil
-                              keep?   (constantly true)}}
+                              keep?   u/constantly-true}}
                       cursor-str]
   (let [sort-attrs (get opts :sort-by)
         decoded-cursor (u/maybe-decode-cursor cursor-str)

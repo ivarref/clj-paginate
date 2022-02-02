@@ -2,29 +2,38 @@
 
 ; based on https://gist.github.com/dmh43/83a7b3e452e83e80eb30
 
-(defrecord Node [value left right])
+(defrecord Node [v start end])
 
-(defn make-node
-  ([value left right]
-   (Node. value left right))
-  ([value]
-   (Node. value nil nil)))
+(defn valid? [^Node node]
+  (when node
+    (when instance? Node node
+                    (if (>= (.-start node) (.-end node))
+                      false
+                      true))))
 
-(defn node? [root]
-  (when root
-    (instance? Node root)))
+(defn mid [^Node node]
+  (int (/ (+ (.-start node) (.-end node)) 2)))
 
 (defn value [^Node node]
-  (when node
-    (.-value node)))
+  (when (valid? node)
+    (nth (.-v node) (mid node))))
+
+(defn new-if-valid [v start end]
+  (if (>= start end)
+    nil
+    (Node. v start end)))
 
 (defn left [^Node node]
-  (when node
-    (.-left node)))
+  (when (valid? node)
+    (new-if-valid (.-v node) (.-start node) (mid node))))
 
 (defn right [^Node node]
-  (when node
-    (.-right node)))
+  (when (valid? node)
+    (new-if-valid (.-v node) (inc (mid node)) (.-end node))))
+
+(defn node? [x]
+  (when x
+    (instance? Node x)))
 
 (defn depth-first-vals
   ([root]
@@ -49,16 +58,8 @@
       (visit-all-depth-first (right root) keep? f))))
 
 
-(defn balanced-tree
-  ([sorted-vec]
-   (balanced-tree sorted-vec 0 (count sorted-vec)))
-  ([sorted-vec start end]
-   (if (>= start end)
-     nil
-     (let [mid (int (/ (+ start end) 2))]
-       (make-node (nth sorted-vec mid)
-                  (balanced-tree sorted-vec start mid)
-                  (balanced-tree sorted-vec (inc mid) end))))))
+(defn balanced-tree [sorted-vec]
+  (new-if-valid sorted-vec 0 (count sorted-vec)))
 
 
 (defn tree-vals [node]
@@ -75,6 +76,13 @@
           (not (keep? (value root))))
     res
     (conj! res (value root))))
+
+
+(defn maybe-conj2! [res value keep? max-items]
+  (if (or (= max-items (count res))
+          (not (keep? value)))
+    res
+    (conj! res value)))
 
 
 (defn take-all-last
@@ -103,30 +111,42 @@
         (maybe-conj! root keep? max-items)
         (take-all-first (right root) keep? max-items))))
 
+(defn take-all-first2
+  [res v start end keep? max-items]
+  (if (or (= max-items (count res))
+          (>= start end))
+    res
+    (let [mid (int (/ (+ start end) 2))]
+      (-> res
+          (take-all-first2 v start mid keep? max-items)
+          (maybe-conj2! (nth v mid) keep? max-items)
+          (take-all-first2 v (inc mid) end keep? max-items)))))
+
 
 (defn- after-value-inner
-  [res root keep? find-value sort-fn max-items]
+  [res v start end keep? find-value sort-fn max-items]
   (if (or (= max-items (count res))
-          (nil? root))
+          (>= start end))
     res
-    (let [curr-val (value root)
+    (let [mid (int (/ (+ start end) 2))
+          curr-val (nth v mid)
           cmp-int (compare (sort-fn find-value) (sort-fn curr-val))]
       (cond (= 0 cmp-int)
-            (take-all-first res (right root) keep? max-items)
+            (take-all-first2 res v (inc mid) end keep? max-items)
 
             (neg-int? cmp-int)
             (-> res
-                (after-value-inner (left root) keep? find-value sort-fn max-items)
-                (maybe-conj! root keep? max-items)
-                (take-all-first (right root) keep? max-items))
+                (after-value-inner v start mid keep? find-value sort-fn max-items)
+                (maybe-conj2! curr-val keep? max-items)
+                (take-all-first2 v (inc mid) end keep? max-items))
 
             :else
-            (after-value-inner res (right root) keep? find-value sort-fn max-items)))))
+            (after-value-inner res v (inc mid) end keep? find-value sort-fn max-items)))))
 
 
 (defn after-value
   [root keep? from-value sort-attrs max-items]
-  (persistent! (after-value-inner (transient []) root keep? from-value (apply juxt sort-attrs) max-items)))
+  (persistent! (after-value-inner (transient []) (.-v root) 0 (count (.-v root)) keep? from-value (apply juxt sort-attrs) max-items)))
 
 
 (defn- before-value-inner

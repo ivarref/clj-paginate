@@ -145,7 +145,7 @@
 
 
 (defn after-value
-  [root keep? from-value sort-attrs max-items]
+  [^Node root keep? from-value sort-attrs max-items]
   (persistent! (after-value-inner (transient []) (.-v root) 0 (count (.-v root)) keep? from-value (apply juxt sort-attrs) max-items)))
 
 

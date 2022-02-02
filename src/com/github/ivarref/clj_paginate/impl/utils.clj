@@ -68,3 +68,16 @@
       (.append sw " "))
     (.append sw "]}")
     (.toString sw)))
+
+
+(defn get-edges [nodes batch-f f sort-attrs cursor]
+  (let [nodes (vec nodes)
+        cursor-pre-str (cursor-pre cursor)
+        batch-nodes (if (not-empty nodes)
+                      (batch-f nodes)
+                      [])]
+    (mapv (fn [org-node batch-node]
+            {:node   (f batch-node)
+             :cursor (node-cursor cursor-pre-str org-node sort-attrs)})
+          nodes
+          batch-nodes)))

@@ -22,14 +22,7 @@
         nodes-plus-1 (if-let [from-value (get cursor :cursor)]
                        (bst/after-value root keep? (zipmap sort-attrs from-value) sort-attrs (inc max-items))
                        (bst/from-beginning root keep? (inc max-items)))
-        nodes (if-let [nodes (not-empty (take max-items nodes-plus-1))]
-                (vec (batch-f (vec nodes)))
-                [])
-        cursor-pre (u/cursor-pre cursor)
-        edges (mapv (fn [node]
-                      {:node   (f node)
-                       :cursor (u/node-cursor cursor-pre node sort-attrs)})
-                    nodes)
+        edges (u/get-edges (take max-items nodes-plus-1) batch-f f sort-attrs cursor)
         hasPrevPage (or (when (not-empty nodes-plus-1)
                           (not= (first nodes-plus-1)
                                 (bst/get-leftmost-value root keep?)))

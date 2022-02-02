@@ -63,3 +63,33 @@
             {:inst 8, :new-prop 1}
             {:inst 9, :new-prop 1}]
            (mapv :node (:edges conn))))))
+
+
+(deftest batch-cursor-first
+  (let [v (vec (range 6))
+        prep (pv/prepare-paginate
+               {:sort-by [:a/inst]}
+               (mapv #(assoc {} :a/inst %) v))
+        batch-f (fn [nodes] (mapv #(assoc {} :b/inst (:a/inst %)) nodes))
+        conn (pv/paginate prep batch-f {:first 3} :batch? true)]
+    (is (= [{:b/inst 0} {:b/inst 1} {:b/inst 2}] (mapv :node (:edges conn))))
+    (is (= [{:b/inst 3} {:b/inst 4} {:b/inst 5}]
+           (mapv :node (:edges
+                         (pv/paginate prep batch-f {:first 3
+                                                    :after (get-in conn [:pageInfo :endCursor])}
+                                      :batch? true)))))))
+
+
+(deftest batch-cursor-last
+  (let [v (vec (range 6))
+        prep (pv/prepare-paginate
+               {:sort-by [:a/inst]}
+               (mapv #(assoc {} :a/inst %) v))
+        batch-f (fn [nodes] (mapv #(assoc {} :b/inst (:a/inst %)) nodes))
+        conn (pv/paginate prep batch-f {:last 3} :batch? true)]
+    (is (= [{:b/inst 3} {:b/inst 4} {:b/inst 5}] (mapv :node (:edges conn))))
+    (is (= [{:b/inst 0} {:b/inst 1} {:b/inst 2}]
+           (mapv :node (:edges
+                         (pv/paginate prep batch-f {:last 3
+                                                    :before (get-in conn [:pageInfo :startCursor])}
+                                      :batch? true)))))))

@@ -4,20 +4,20 @@
             [com.github.ivarref.clj-paginate.ticker :as ticker])
   (:import (java.lang AutoCloseable)))
 
-(deftest perftest
-  (let [n 10e6
-        total-vec (vec (range n))
-        conn (bmt/pagg2 (mapv #(assoc {} :inst %) total-vec)
-                        {:sort-by [:inst]}
-                        {:first 1000})
-        all-items (with-open [^AutoCloseable tick (ticker/ticker n)]
-                    (loop [so-far []]
-                      (if-let [new-items (not-empty @conn)]
-                        (do
-                          (tick (count new-items))
-                          (recur (into so-far new-items)))
-                        so-far)))]
-    (is (= all-items total-vec))))
+#_(deftest perftest
+    (let [n 10e6
+          total-vec (vec (range n))
+          conn (bmt/pagg2 (mapv #(assoc {} :inst %) total-vec)
+                          {:sort-by [:inst]}
+                          {:first 1000})
+          all-items (with-open [^AutoCloseable tick (ticker/ticker n)]
+                      (loop [so-far []]
+                        (if-let [new-items (not-empty @conn)]
+                          (do
+                            (tick (count new-items))
+                            (recur (into so-far new-items)))
+                          so-far)))]
+      (is (= all-items total-vec))))
 
 (comment
   (do

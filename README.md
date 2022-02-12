@@ -2,7 +2,7 @@
 
 A Clojure (JVM only) implementation of the 
 [GraphQL Cursor Connections Specification](https://relay.dev/graphql/connections.htm) 
-with vector/set as the backing data.
+with vector as the backing data.
 
 Supports: 
 * Collection that grows and/or changes.

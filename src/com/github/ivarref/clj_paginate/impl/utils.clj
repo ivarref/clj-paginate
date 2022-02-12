@@ -15,7 +15,6 @@
         v (vec (sort-by (apply juxt srt-by) v))]
     {:root         (bst/balanced-tree v)
      :input-vector v
-     :id           (str (UUID/randomUUID))
      :version      (str (get opts :version @version))
      :opts         {:sort-by srt-by}}))
 
@@ -48,24 +47,16 @@
 
 (defn get-total-count [root keep? id decoded-cursor old-count]
   (when root
-    (cond
-      (= keep? constantly-true)
-      (count (.-v root))
-
-      (and old-count (= id (:id decoded-cursor)))
-      old-count
-
-      :else
-      (let [v (.-v root)]
-        (loop [i 0
-               cnt 0]
-          (if (= i (count v))
-            cnt
-            (recur (inc i)
-                   (+ cnt
-                      (if (keep? (nth v i))
-                        1
-                        0)))))))))
+    (let [v (.-v root)]
+      (loop [i 0
+             cnt 0]
+        (if (= i (count v))
+          cnt
+          (recur (inc i)
+                 (+ cnt
+                    (if (keep? (nth v i))
+                      1
+                      0))))))))
 
 
 (defn cursor-pre [cursor]

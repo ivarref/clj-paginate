@@ -6,26 +6,27 @@
 
 
 (deftest perftest2
-  (let [n 10e6
-        total-vec (vec (range n))
+  (let [n 1e6
+        total-n (* n 10)
+        total-vec (shuffle (vec (range total-n)))
         items (atom total-vec)
-        eat! (fn [n]
-               (let [r (take n @items)]
-                 (swap! items (fn [old-items] (vec (drop n old-items))))
-                 (mapv #(assoc {} :inst %) r)))
-        data {"1" (eat! 1e6)
-              "2" (eat! 1e6)
-              "3" (eat! 1e6)
-              "4" (eat! 1e6)
-              "5" (eat! 1e6)
-              "6" (eat! 1e6)
-              "7" (eat! 1e6)
-              "8" (eat! 1e6)
-              "9" (eat! 1e6)
-              "10" (eat! 1e6)}
+        eat! (fn []
+               (let [r (take (int n) @items)]
+                 (swap! items (fn [old-items] (vec (drop (int n) old-items))))
+                 (mapv #(assoc {} :inst %) (sort r))))
+        data {"1" (eat!)
+              "2" (eat!)
+              "3" (eat!)
+              "4" (eat!)
+              "5" (eat!)
+              "6" (eat!)
+              "7" (eat!)
+              "8" (eat!)
+              "9" (eat!)
+              "10" (eat!)}
         opts {:sort-attrs [:inst]
               :max-items 1000}
-        all-items (with-open [^AutoCloseable tick (ticker/ticker n)]
+        all-items (with-open [^AutoCloseable tick (ticker/ticker total-n)]
                     (loop [so-far []
                            conn (pm/paginate-first data opts nil)]
                       (if-let [edges (not-empty (:edges conn))]
@@ -34,4 +35,16 @@
                           (recur (into so-far (mapv (comp :inst :node) edges))
                                  (pm/paginate-first data opts (:cursor (last edges)))))
                         so-far)))]
-    (is (= all-items total-vec))))
+    (is (= all-items (vec (range total-n))))))
+
+(comment
+  (do
+    ; echo 1 | sudo tee /proc/sys/kernel/perf_event_paranoid
+    (require '[clj-async-profiler.core :as prof])
+    (doseq [f (->> (file-seq (clojure.java.io/file "/tmp/clj-async-profiler/results"))
+                   (remove #(.isDirectory %)))]
+      (.delete f))
+    (prof/profile (clojure.test/test-var #'perftest2))))
+
+(comment
+  (prof/serve-files 8080))

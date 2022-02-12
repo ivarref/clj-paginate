@@ -71,7 +71,7 @@
 
 (defn after-value [vecs keep? value sort-attrs max-items]
   (let [sort-fn (apply juxt sort-attrs)
-        vecs (map #(after-value-single % keep? value sort-fn max-items) vecs)]
+        vecs (mapv #(after-value-single % keep? value sort-fn max-items) vecs)]
     (->> vecs
          (reduce into [])
          (sort-by sort-fn)

@@ -1,6 +1,7 @@
 (ns com.github.ivarref.clj-paginate.impl.pag-first-map
   (:require [com.github.ivarref.clj-paginate.impl.bst2 :as bst2]
-            [com.github.ivarref.clj-paginate.impl.utils :as u]))
+            [com.github.ivarref.clj-paginate.impl.utils :as u]
+            [com.github.ivarref.clj-paginate.impl.after-value-bst :as av-bst]))
 
 (defn paginate-first [m
                       {:keys [max-items
@@ -14,11 +15,14 @@
                               context nil
                               keep?   (constantly true)}}
                       cursor-str]
-  (let [vecs (vals m)
+  (let [vecs (into [] (vals m))
         decoded-cursor (u/maybe-decode-cursor cursor-str)
         cursor (-> (merge {:context context} decoded-cursor))
         nodes-plus-1 (if-let [from-value (get cursor :cursor)]
-                       (bst2/after-value vecs keep? (zipmap sort-attrs from-value) sort-attrs (inc max-items))
+                       (bst2/after-value2 vecs keep?
+                                          (zipmap sort-attrs from-value)
+                                          (apply juxt sort-attrs)
+                                          (inc max-items))
                        (bst2/from-beginning vecs keep? sort-attrs (inc max-items)))
         edges (u/get-edges (take max-items nodes-plus-1) batch-f f sort-attrs cursor)
         hasPrevPage (or (when (not-empty nodes-plus-1)

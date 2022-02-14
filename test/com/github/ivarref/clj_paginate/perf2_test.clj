@@ -26,21 +26,24 @@
               "10" (eat!)}
         opts {:sort-attrs [:inst]
               :max-items 1000}
-        all-items (with-open [^AutoCloseable tick (ticker/ticker total-n)]
-                    (loop [so-far []
-                           conn (pm/paginate-first data opts nil)]
-                      (if-let [edges (not-empty (:edges conn))]
-                        (do
-                          (tick (count edges))
-                          (recur (into so-far (mapv (comp :inst :node) edges))
-                                 (pm/paginate-first data opts (:cursor (last edges)))))
-                        so-far)))]
+        all-items (prof/profile
+                    (with-open [^AutoCloseable tick (ticker/ticker total-n)]
+                      (loop [so-far []
+                             conn (pm/paginate-first data opts nil)]
+                        (if-let [edges (not-empty (:edges conn))]
+                          (do
+                            (tick (count edges))
+                            (recur (into so-far (mapv (comp :inst :node) edges))
+                                   (pm/paginate-first data opts (:cursor (last edges)))))
+                          so-far))))]
     (is (= all-items (vec (range total-n))))))
+; [########################################] 100% done, 2383 µs/iter
 
 (comment
   (do
     ; echo 1 | sudo tee /proc/sys/kernel/perf_event_paranoid
     (require '[clj-async-profiler.core :as prof])
+    #_(prof/serve-files 8080)
     (doseq [f (->> (file-seq (clojure.java.io/file "/tmp/clj-async-profiler/results"))
                    (remove #(.isDirectory %)))]
       (.delete f))

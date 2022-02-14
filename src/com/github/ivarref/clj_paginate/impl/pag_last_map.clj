@@ -3,18 +3,18 @@
             [com.github.ivarref.clj-paginate.impl.bst2 :as bst2]
             [com.github.ivarref.clj-paginate.impl.bst-before :as bst]))
 
-(defn paginate-first [m
-                      {:keys [max-items
-                              f
-                              batch-f
-                              keep?
-                              sort-attrs
-                              context]
-                       :or   {f       identity
-                              batch-f identity
-                              context nil
-                              keep?   (constantly true)}}
-                      cursor-str]
+(defn paginate-last [m
+                     {:keys [max-items
+                             f
+                             batch-f
+                             keep?
+                             sort-attrs
+                             context]
+                      :or   {f       identity
+                             batch-f identity
+                             context nil
+                             keep?   (constantly true)}}
+                     cursor-str]
   (let [vecs (into [] (vals m))
         decoded-cursor (u/maybe-decode-cursor cursor-str)
         cursor (-> (merge {:context context} decoded-cursor))
@@ -25,7 +25,7 @@
                                          sort-fn
                                          (inc max-items))
                        (bst/from-end vecs keep? sort-fn (inc max-items)))
-        edges (u/get-edges (take max-items nodes-plus-1) batch-f f sort-attrs cursor)
+        edges (u/get-edges (take-last max-items nodes-plus-1) batch-f f sort-attrs cursor)
         hasPrevPage (or (when (not-empty nodes-plus-1)
                           (not= (last nodes-plus-1)
                                 (first (bst/from-end vecs keep? sort-fn 1))))

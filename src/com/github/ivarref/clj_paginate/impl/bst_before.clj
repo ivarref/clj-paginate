@@ -34,6 +34,46 @@
             (or (before-value-index keep? find-value sort-fn [v (inc mid) end])
                 (contains-index v mid keep?))))))
 
+(defrecord tmpres [v vidx idx])
+
+(defn before-value-take [^IPersistentVector vecs keep? sort-fn max-items starting-indexes]
+  (loop [res (transient [])
+         indexes starting-indexes]
+    (if (= max-items (count res))
+      (persistent! res)
+      (if-let [^tmpres v (let [cnt (count indexes)]
+                           (loop [vec-idx 0
+                                  ^tmpres res nil]
+                             (if (= vec-idx cnt)
+                               res
+                               (let [idx (get-nth indexes vec-idx)]
+                                 (if (nil? idx)
+                                   (recur (inc vec-idx) res)
+                                   (let [v (get-nth (get-nth vecs vec-idx) idx)]
+                                     (if (and (keep? v)
+                                              (or (nil? res)
+                                                  (neg-int? (compare (sort-fn v) (sort-fn (.-v res))))))
+                                       (recur (inc vec-idx) (tmpres. v vec-idx idx))
+                                       (recur (inc vec-idx) res))))))))]
+        (recur (conj! res (.-v v))
+               (assoc indexes (.-vidx v) (contains-index (get-nth vecs (.-vidx v))
+                                                         (dec (.-idx v))
+                                                         keep?)))
+        (persistent! res)))))
+
+(defn before-value [vecs keep? from-value sort-fn max-items]
+  (->> vecs
+       (mapv init-vector)
+       (mapv (partial before-value-index keep? from-value sort-fn))
+       (before-value-take vecs keep? sort-fn max-items)))
+
+(defn from-end
+  [vecs keep? sort-fn max-items]
+  (before-value-take vecs keep? sort-fn max-items (mapv (fn [v]
+                                                          (when (>= 1 (count v))
+                                                            (dec (count v))))
+                                                        vecs)))
+
 (comment
   (let [v [0 1 2 3 4 5 6 7 8 9]
         start-index (before-value-index

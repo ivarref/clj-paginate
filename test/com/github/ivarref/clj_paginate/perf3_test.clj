@@ -14,7 +14,7 @@
     (RT/vector (.toArray al))))
 
 (deftest perftest3
-  (let [n 10
+  (let [n 1e5
         total-n (* n 10)
         total-vec (deterministic-shuffle (vec (range total-n)) 789)
         items (atom total-vec)
@@ -43,5 +43,5 @@
                           (recur (into (mapv (comp :inst :node) edges) so-far)
                                  (pm/paginate-last data opts (:cursor (first edges)))))
                         so-far)))]
-    (println all-items)
     (is (= all-items (vec (range total-n))))))
+; [########################################] 100% done, 15389 µs/iter

@@ -67,7 +67,7 @@
 
 (defn from-beginning
   [vecs keep? sort-fn max-items]
-  (after-value-take vecs keep? sort-fn max-items (mapv (constantly 0) vecs)))
+  (after-value-take vecs keep? sort-fn max-items (mapv (fn [v] (if (empty? v) nil 0)) vecs)))
 
 
 (defn exclusion-count [[v start end] keep?]

@@ -1,7 +1,6 @@
 (ns com.github.ivarref.clj-paginate
-  (:require [com.github.ivarref.clj-paginate.impl.paginate-first :as pf]
-            [com.github.ivarref.clj-paginate.impl.paginate-last :as pl]
-            [com.github.ivarref.clj-paginate.impl.bst :as bst]
+  (:require [com.github.ivarref.clj-paginate.impl.pag-first-map :as pf]
+            [com.github.ivarref.clj-paginate.impl.pag-last-map :as pl]
             [com.github.ivarref.clj-paginate.impl.utils :as u]))
 
 
@@ -9,20 +8,6 @@
   "Gets the :context from a previous invocation of paginate as stored in :before or :after"
   [opts]
   (:context (u/get-cursor opts)))
-
-
-(defn prepare-paginate
-  "Prepares data for pagination. Coll should be a set or a vector.
-
-  Opts must be a map that contains :sort-by, which should be a vector of keywords
-  that determine the ordering of coll.
-
-  Opts may contain a key :version that specifies the version of the running code.
-  This field will be used to detect and reset old cursors.
-  It defaults to a random uuid.
-  You may set it to for example the current git sha."
-  [{:keys [sort-by version] :as opts} coll]
-  (u/balanced-tree coll opts))
 
 
 (defn paginate
@@ -39,7 +24,10 @@
               :endCursor String}}
 
   Required parameters:
-  prepared: The previously prepared data from prepare-paginate.
+  data: The data to paginated. Must be either a vector or a map with vectors are values.
+  All vectors must be sorted according to `sort-attrs`.
+
+  sort-attrs: How the vectors in `data` is sorted.
 
   f: Invoked on each node. Invoked once on all nodes if :batch? is true.
 
@@ -59,7 +47,7 @@
 
   :auto-reset?: Whether to detect and automatically reset old cursors.
                 Defaults to false."
-  [prepared f opts & {:keys [filter context batch? auto-reset?] :or {filter (constantly true) context {} batch? false auto-reset? false}}]
+  [data sort-attrs f opts & {:keys [filter context batch?] :or {filter (constantly true) context {} batch? false}}]
   (assert (fn? f) "Expected f to be a function")
   (assert (fn? filter) "Expected keep? to be a function")
   (assert (map? opts) "Expected opts to be a map")
@@ -67,10 +55,12 @@
                 {:batch-f f}
                 {:f f})
         cursor-str (or (get opts :after) (get opts :before))
-        cursor-str (if (and auto-reset?
-                            (u/old-cursor? (u/maybe-decode-cursor cursor-str) (:version prepared)))
-                     nil
-                     cursor-str)]
+        sort-attrs (if (keyword? sort-attrs)
+                     [sort-attrs]
+                     sort-attrs)
+        data (if (vector? data)
+               {"default" data}
+               data)]
     (binding [*print-dup* false
               *print-meta* false
               *print-readably* true
@@ -87,7 +77,7 @@
         (and (some? (get opts :last)) (some? (get opts :after)))
         (throw (ex-info ":last and :after given, please use :last with :before" {:opts opts}))
 
-        (nil? (:root prepared))
+        (empty? data)
         {:edges    []
          :pageInfo {:hasNextPage false
                     :hasPrevPage false
@@ -95,23 +85,22 @@
                     :endCursor   (pr-str {:context context})
                     :totalCount  0}}
 
-        (false? (bst/node? (:root prepared)))
-        (throw (ex-info "Expected input parameter `prepared` to be of type com.github.ivarref.clj-paginate.impl.bst Node, please use com.github.ivarref.clj-paginate/prepare-paginate" {:prepared prepared}))
-
         (pos-int? (get opts :first))
-        (pf/paginate-first prepared
+        (pf/paginate-first data
                            (merge f-map
-                                  {:max-items (get opts :first)
-                                   :keep?     filter
-                                   :context   context})
+                                  {:max-items  (get opts :first)
+                                   :keep?      filter
+                                   :context    context
+                                   :sort-attrs sort-attrs})
                            cursor-str)
 
         (pos-int? (get opts :last))
-        (pl/paginate-last prepared
+        (pl/paginate-last data
                           (merge f-map
-                                 {:max-items (get opts :last)
-                                  :keep?     filter
-                                  :context   context})
+                                 {:max-items  (get opts :last)
+                                  :keep?      filter
+                                  :context    context
+                                  :sort-attrs sort-attrs})
                           cursor-str)
 
         :else

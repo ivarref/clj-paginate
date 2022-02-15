@@ -10,6 +10,8 @@ Supports:
 * OR filtering (maps only).
 * Batching (optional).
 
+No external dependencies.
+
 ## Prerequisites
 
 The user of this library is assumed to be moderately
@@ -126,6 +128,10 @@ This library was developed for supporting pagination for "heavy" Datomic queries
 spent too much time on delivering the initial result that would then have to be sorted and
 paginated.
 
+## Data requirements
+
+1. Nodes must be maps.
+2. Vectors passed to `paginate` must be sorted according to `sort-attrs`.
 
 ## Basic use case example
 

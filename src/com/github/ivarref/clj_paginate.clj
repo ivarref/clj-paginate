@@ -15,6 +15,7 @@
   ===================
   data: The data to paginate. Must be either a vector or a map with vectors as values.
         All vectors must be sorted according to `sort-attrs`.
+        Elements in the vectors must be maps.
 
   sort-attrs: How the vectors in `data` is sorted.
               Should be a single keyword or a vector of keywords.

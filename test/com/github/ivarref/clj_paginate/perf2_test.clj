@@ -14,7 +14,7 @@
     (RT/vector (.toArray al))))
 
 (deftest perftest2
-  (let [n 1e6
+  (let [n 1e5
         total-n (* n 10)
         total-vec (deterministic-shuffle (vec (range total-n)) 789)
         items (atom total-vec)

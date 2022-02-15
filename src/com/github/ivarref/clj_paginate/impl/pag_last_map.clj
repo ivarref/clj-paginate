@@ -23,10 +23,7 @@
                           decoded-cursor))
         sort-fn (apply juxt sort-attrs)
         nodes-plus-1 (if-let [from-value (get cursor :cursor)]
-                       (bst/before-value vecs keep?
-                                         (zipmap sort-attrs from-value)
-                                         sort-fn
-                                         (inc max-items))
+                       (bst/before-value vecs keep? (zipmap sort-attrs from-value) sort-fn (inc max-items))
                        (bst/from-end vecs keep? sort-fn (inc max-items)))
         edges (u/get-edges (take-last max-items nodes-plus-1) batch-f f sort-attrs cursor)
         hasPrevPage (or (when (not-empty nodes-plus-1)

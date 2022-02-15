@@ -1,9 +1,7 @@
 (ns com.github.ivarref.clj-paginate.global-sort-test
   (:require [clojure.test :refer [deftest is]]
-            [com.github.ivarref.clj-paginate.impl.pag-last-map :as pl]
             [com.github.ivarref.clj-paginate.impl.pag-first-map :as pf]
-            [clojure.set :as set]
-            [com.github.ivarref.clj-paginate.impl.utils :as u])
+            [clojure.set :as set])
   (:import (clojure.lang IDeref IFn ILookup)))
 
 

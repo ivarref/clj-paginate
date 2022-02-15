@@ -45,10 +45,11 @@
            f must return the output nodes in the same order as the input nodes.
            Defaults to false."
   [data sort-attrs f opts & {:keys [filter context batch?] :or {filter (constantly true) context {} batch? false}}]
-  (assert (fn? f) "Expected f to be a function")
   (assert (fn? filter) "Expected keep? to be a function")
   (assert (map? opts) "Expected opts to be a map")
-  (let [f-map (if batch?
+  (let [f (if (keyword? f) (fn [node] (get node f)) f)
+        _ (assert (fn? f) "Expected f to be a function")
+        f-map (if batch?
                 {:batch-f f}
                 {:f f})
         cursor-str (or (get opts :after) (get opts :before))

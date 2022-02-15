@@ -1,10 +1,9 @@
 (ns com.github.ivarref.clj-paginate.paginate-test
   (:require [clojure.test :refer [deftest is]]
-            [com.github.ivarref.clj-paginate.impl.paginate-first :as bm]
-            [com.github.ivarref.clj-paginate.impl.paginate-last :as bml]
+            [com.github.ivarref.clj-paginate.impl.pag-first-map :as pf]
+            [com.github.ivarref.clj-paginate.impl.pag-last-map :as pl]
             [com.github.ivarref.clj-paginate.stacktrace]
-            [clojure.set :as set]
-            [com.github.ivarref.clj-paginate.impl.utils :as u])
+            [clojure.set :as set])
   (:import (clojure.lang ILookup IFn IDeref)))
 
 
@@ -24,9 +23,8 @@
        :startCursor))
 
 
-(defn pagg2 [data opts fetch-opts]
-  (let [opts (atom opts)
-        data (atom (u/balanced-tree data @opts))
+(defn pagg2 [data sort-attrs fetch-opts]
+  (let [data (atom (vec (sort-by (apply juxt sort-attrs) data)))
         fetch-opts (atom fetch-opts)
         conn (atom nil)]
     (reify
@@ -46,24 +44,27 @@
       IFn
       (invoke [this s]
         (cond (vector? s)
-              (do (reset! data (u/balanced-tree s @opts))
-                  this)
-
-              (map? s)
-              (do (reset! opts s)
+              (do (reset! data (vec (sort-by (apply juxt sort-attrs) s)))
                   this)))
+
       IDeref
       (deref [_]
         (when (:first @fetch-opts)
-          (reset! conn (bm/paginate-first
-                         @data
-                         (set/rename-keys @fetch-opts {:first :max-items})
+          (reset! conn (pf/paginate-first
+                         {"default" @data}
+                         (merge
+                           @fetch-opts
+                           {:sort-attrs sort-attrs}
+                           (set/rename-keys @fetch-opts {:first :max-items}))
                          (when-let [conn @conn]
                            (after conn)))))
         (when (:last @fetch-opts)
-          (reset! conn (bml/paginate-last
-                         @data
-                         (set/rename-keys @fetch-opts {:last :max-items})
+          (reset! conn (pl/paginate-last
+                         {"default" @data}
+                         (merge
+                           @fetch-opts
+                           {:sort-attrs sort-attrs}
+                           (set/rename-keys @fetch-opts {:last :max-items}))
                          (when-let [conn @conn]
                            (before conn)))))
         (nodes @conn)))))
@@ -72,9 +73,8 @@
 (deftest invokes-f
   (let [conn (pagg2
                (shuffle
-                 [{:inst 0} {:inst 1} {:inst 2} {:inst 3}
-                  {:inst 4}])
-               {:sort-by [:inst]}
+                 [{:inst 0} {:inst 1} {:inst 2} {:inst 3} {:inst 4}])
+               [:inst]
                {:first 2
                 :f     (fn [{:keys [inst]}]
                          {:inst (inc inst)})})]
@@ -86,7 +86,7 @@
                (shuffle
                  [{:inst 0} {:inst 1} {:inst 2} {:inst 3}
                   {:inst 4}])
-               {:sort-by [:inst]}
+               [:inst]
                {:last 2
                 :f     (fn [{:keys [inst]}]
                          {:inst (inc inst)})})]
@@ -99,7 +99,7 @@
                (shuffle
                  [{:inst 0} {:inst 1} {:inst 2} {:inst 3}
                   {:inst 4}])
-               {:sort-by [:inst]}
+               [:inst]
                {:first 2
                 :f     (fn [{:keys [inst]}]
                          (swap! cnt inc)
@@ -113,7 +113,7 @@
                (shuffle
                  [{:inst 0} {:inst 1} {:inst 2} {:inst 3}
                   {:inst 4}])
-               {:sort-by [:inst]}
+               [:inst]
                {:first 2})]
     (is (= [0 1] @conn))
     (is (false? (:hasPrevPage conn)))
@@ -163,7 +163,7 @@
                   {:inst :a2 :group :a}
                   {:inst :b1 :group :b}
                   {:inst :b2 :group :b}])
-               {:sort-by [:inst]}
+               [:inst]
                {:first 10
                 :keep? #(= :a (:group %))})]
     (is (= [:a1 :a2] @conn))
@@ -185,7 +185,7 @@
                 {:inst 2 :group :a}
                 {:inst 3 :group :b}
                 {:inst 4 :group :b}]
-               {:sort-by [:inst :group]}
+               [:inst :group]
                {:last 3})]
     (is (= [2 3 4] @conn))
     (is (false? (:hasPrevPage conn)))
@@ -219,7 +219,7 @@
                 {:inst 2 :group :a}
                 {:inst 1 :group :b}
                 {:inst 3 :group :b}]
-               {:sort-by [:inst]}
+               [:inst]
                {:first 4})]
     (is (= [0 1 2 3] @conn))
 

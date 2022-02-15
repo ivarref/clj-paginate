@@ -275,7 +275,7 @@ ordering as the input vector.  You may want to use the function
 `clj-paginate` treats the (sorted) input vectors as binary search trees,
 and thus the general performance is `O(log n)` for finding where to continue
 giving out data. When paginating over maps, this
-will have to be multiplied by the number of selected keys.
+has to be multiplied by the number of selected keys.
 
 Using `:first 1000` and 10 million dummy entries, the average
 overhead was about 1-5 ms per iteration on my machine. That is about

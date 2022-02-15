@@ -5,11 +5,9 @@ A Clojure (JVM only) implementation of the
 with vector or map as the backing data.
 
 Supports: 
-* Collection that grows and/or changes.
+* Collections that grows and/or changes.
 * Long polling (`:first` only, not `:last`).
-* Used defined context stored in the cursor.
-* Or based filtering (maps only).
-* Sort based filtering.
+* OR filtering (maps only).
 * Batching (optional).
 
 ## Prerequisites
@@ -167,16 +165,14 @@ paginated.
 
 That is all that is needed for the basic use case to work.
 
-## Simple OR filters
+## OR filters
 
-Sometimes you may want to provide a simple filtering of the data.
-This is done in four steps:
+Sometimes you may want to provide a filtering of the data.
+This is done in two steps:
 
-1. Your HTTP endpoint must support parameters that represents the or filter.
-2. Create the or filter based on the initial query or the given cursor.
-3. Create a filter function based on the filters. Pass this to the paginate function using `:filter`. 
-4. Pass `:context` to the paginate function to store the filters in the cursor, 
-i.e. it will be used in subsequent queries.
+1. Your HTTP endpoint must support a parameter that represents the or filter.
+2. Pass a map to the `paginate` function along with `:filter` in `opts`.
+   `:filter` should be a vector of the keys of the map that you want to filter on. 
 
 As an example, let's add a `:status` property to our previous example and make it filterable:
 
@@ -184,48 +180,60 @@ As an example, let's add a `:status` property to our previous example and make i
 (require '[com.github.ivarref.clj-paginate :as cp])
 
 (def data
-  (group-by :status
-            [{:inst 0 :id 1 :status :init}
-             {:inst 1 :id 2 :status :pending}
-             {:inst 2 :id 3 :status :done}
-             {:inst 3 :id 4 :status :error}]))
-
+   (group-by :status
+             [{:inst 0 :id 1 :status :init}
+              {:inst 1 :id 2 :status :pending}
+              {:inst 2 :id 3 :status :done}
+              {:inst 3 :id 4 :status :error}
+              {:inst 4 :id 5 :status :done}]))
 
 (defn http-post-handler
-  [response my-cache {:keys [statuses] :as http-body}]
-  (let [statuses (into #{} (or 
-                             ; Prefer the statuses that was stored in the cursor:
-                             (:statuses (cp/get-context http-body))
-                             
-                             ; Use the specified statuses given on the initial request:
-                             (not-empty statuses)
-                             
-                             ; Default to include all statuses:
-                             [:init :pending :done :error]))]
-    (assoc response
-        :status 200
-        :body (cp/paginate
-                my-cache
-                
-                (fn [{:keys [inst id] :as node}]
+   [response data http-body]
+   (assoc response
+      :status 200
+      :body (cp/paginate
+               data ; data is now a map.
+               :inst
+               (fn [{:keys [inst id] :as node}]
                   (Thread/sleep 10) ; Do some heavy work.
                   (assoc node :value-from-db 1))
-                
-                http-body ; :first or :last, and optionally :after or :before.
-                
-                ; Filter nodes by specifying :filter. 
-                ; Only nodes for which :filter returns truthy is included in the returned edges.
-                :filter (fn [{:keys [status]}] (contains? statuses status))
-                
-                ; Pass the named parameter :context to add data to the cursor.
-                ; The context must be `pr-str`-able.  
-                :context {:statuses statuses}))))
+
+               ; Assume that the HTTP endpoint accepts a parameter `:statuses` for the body,
+               ; and that when present, this is a vector such as `[:init :pending :done :error]` or similar,
+               ; i.e. the keys of `data` that we want to filter on.
+               ;
+               ; Paginate's `opts` accepts a key `:filter` that does exactly this for data maps.
+               ; Thus we can simply rename `:statuses` to `:filter` in the http body.
+               ; clj-paginate takes care of storing the value of `:filter` in the cursor
+               ; for subsequent queries.
+               (clojure.set/rename-keys http-body {:statuses :filter}))))
+
+; To illustrate this, consider the following code:
+(let [conn (cp/paginate
+              data
+              :inst
+              identity
+              {:first  1
+               :filter [:done]})]
+   ; Will print [{:inst 2, :id 3, :status :done}].
+   (println (mapv :node (:edges conn))) 
+
+   ; Will print [{:inst 4, :id 5, :status :done}].
+   ; Notice here that we do not re-specify `:filter`.
+   ; It is already stored in the cursor from the original connection.
+   (println (mapv :node (:edges (cp/paginate
+                                   data
+                                   :inst
+                                   identity
+                                   {:first 1
+                                    :after (get-in conn [:pageInfo :endCursor])})))))
 ```
 
 The consumer client only needs to send `:statuses` on the initial query.
 When subsequent iteration is done, the cursor, `:after` or `:before`,
-already includes `:statuses`, and thus it is not necessary to re-send
-this information on every request.
+already includes `:filter`, and thus it is not necessary to re-send
+this information on every request. If `:filter` is not specified for
+a map, every key is included.
 
 ### Batching
 
@@ -255,38 +263,17 @@ ordering as the input vector.  You may want to use the function
                      )))
 ```
 
-### Auto reset
-
-Your pagination logic may change from deploy to deploy, and the
-cursor returned may not be backwards compatible.
-But your consumers may keep polling using old cursors.
-
-By default the cursor includes a `:version` field that is a stringified random
-UUID, created at the first invocation of `prepare-paginate`.
-If the field in the cursor does not match with the value held in memory
-by the running backend, `paginate` will start over and ignore the old cursor.
-This means that a consumer polling with an old cursor will simply start
-getting the data from the beginning again, and not have to be explicitly restarted.
-
-`:version` may be specified in the `opts` map when calling `prepare-paginate`,
-and may be set to for example the current git sha.
-Otherwise it defaults to a random UUID.
-
-You may turn on the auto reset feature by specifying `:auto-reset? true`
-when calling `paginate`. By default this feature is disabled.
-
 
 ## Performance
 
-`prepare-paginate` turns the input collection into a binary search tree,
+`clj-paginate` treats the (sorted) input vectors as binary search trees,
 and thus the general performance is `O(log n)` for finding where to continue
-giving out data.
-However, if `:filter` is used and seldom matches anything, it may very
-well be much worse, `O(n)`. Use `:filter` at your own risk!
+giving out data. When paginating over maps, this
+will have to be multiplied by the number of selected keys.
 
 Using `:first 1000` and 10 million dummy entries, the average
-overhead was about 1 ms per iteration on my machine. That is about
-1 microsecond per returned node.
+overhead was about 1-5 ms per iteration on my machine. That is about
+1-5 microsecond per returned node.
 
 ## License
 

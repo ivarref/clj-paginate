@@ -11,40 +11,44 @@
 
 
 (defn paginate
-  "Paginates the prepared data. Returns a map of
-  {:edges [{:node { ...}
-            :cursor ...}
-           {:node { ...}
-            :cursor ...}
-           ...]
-   :pageInfo {:hasNextPage Boolean
-              :hasPrevPage Boolean
-              :totalCount Integer
-              :startCursor String
-              :endCursor String}}
-
-  Required parameters:
-  data: The data to paginated. Must be either a vector or a map with vectors are values.
-  All vectors must be sorted according to `sort-attrs`.
+  "Required parameters
+  ===================
+  data: The data to paginate. Must be either a vector or a map with vectors as values.
+        All vectors must be sorted according to `sort-attrs`.
 
   sort-attrs: How the vectors in `data` is sorted.
+              Should be a single keyword or a vector of keywords.
 
   f: Invoked on each node. Invoked once on all nodes if :batch? is true.
 
   opts: A map that should contain :first or :last, as well as optionally :after or :before.
 
-  Optional named parameters:
-  :filter: For a node to be included, this function must return truthy, i.e. any value except nil and false.
-           Defaults to (constantly true).
-
+  Optional named parameters
+  =========================
   :context: User-defined data to store in every cursor. Must be pr-str-able.
-            Defaults to {}.
+            Defaults to {}. Can be retrieved on subsequent queries using
+            `(get-context ...)`.
 
   :batch?: Set to true if f should be invoked once on all nodes,
            and not once for each node. If this is set to true,
            f must return the output nodes in the same order as the input nodes.
-           Defaults to false."
-  [data sort-attrs f opts & {:keys [time-filter context batch?] :or {time-filter (constantly true) context {} batch? false}}]
+           Defaults to false.
+
+
+  Return value
+  ============
+  The paginated data.
+  Returns a map of
+    {:edges [{:node { ...} :cursor ...}
+             {:node { ...} :cursor ...}
+              ...]
+     :pageInfo {:hasNextPage Boolean
+                :hasPrevPage Boolean
+                :totalCount Integer
+                :startCursor String
+                :endCursor String}}"
+  [data sort-attrs f opts & {:keys [time-filter context batch?]
+                             :or {time-filter (constantly true) context {} batch? false}}]
   (assert (fn? time-filter) "Expected keep? to be a function")
   (assert (map? opts) "Expected opts to be a map")
   (let [f (if (keyword? f) (fn [node] (get node f)) f)
@@ -59,8 +63,9 @@
         data (if (vector? data)
                {"default" data}
                data)
-        filter (or (get opts :filter)
-                   (get (u/maybe-decode-cursor cursor-str) :filter))
+        filter (when-let [filter (not-empty (or (get opts :filter)
+                                                (get (u/maybe-decode-cursor cursor-str) :filter)))]
+                 (vec (distinct filter)))
         data (if (not-empty filter)
                (select-keys data filter)
                data)]

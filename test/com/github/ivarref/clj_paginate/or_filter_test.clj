@@ -18,7 +18,7 @@
                data
                :inst
                identity
-               {:first 2
+               {:first  2
                 :filter [:done]})]
     (is (= [2 4] (mapv (comp :inst :node) (:edges conn))))
     (is (= [5] (mapv (comp :inst :node)
@@ -30,7 +30,7 @@
                                 :after (get-in conn [:pageInfo :endCursor])})))))))
 
 
-(deftest missing-filter->no-filter
+(deftest missing-filter->include-everything
   (let [conn (cp/paginate
                data
                :inst

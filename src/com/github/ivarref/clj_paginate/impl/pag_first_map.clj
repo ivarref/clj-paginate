@@ -8,7 +8,8 @@
                               batch-f
                               keep?
                               sort-attrs
-                              context]
+                              context
+                              filter]
                        :or   {f       identity
                               batch-f identity
                               context nil
@@ -16,7 +17,9 @@
                       cursor-str]
   (let [vecs (into [] (vals m))
         decoded-cursor (u/maybe-decode-cursor cursor-str)
-        cursor (-> (merge {:context context} decoded-cursor))
+        cursor (-> (merge {:context context}
+                          (when filter {:filter filter})
+                          decoded-cursor))
         sort-fn (apply juxt sort-attrs)
         nodes-plus-1 (if-let [from-value (get cursor :cursor)]
                        (bst2/after-value2 vecs keep?

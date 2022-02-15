@@ -44,8 +44,8 @@
            and not once for each node. If this is set to true,
            f must return the output nodes in the same order as the input nodes.
            Defaults to false."
-  [data sort-attrs f opts & {:keys [filter context batch?] :or {filter (constantly true) context {} batch? false}}]
-  (assert (fn? filter) "Expected keep? to be a function")
+  [data sort-attrs f opts & {:keys [time-filter context batch?] :or {time-filter (constantly true) context {} batch? false}}]
+  (assert (fn? time-filter) "Expected keep? to be a function")
   (assert (map? opts) "Expected opts to be a map")
   (let [f (if (keyword? f) (fn [node] (get node f)) f)
         _ (assert (fn? f) "Expected f to be a function")
@@ -58,6 +58,11 @@
                      sort-attrs)
         data (if (vector? data)
                {"default" data}
+               data)
+        filter (or (get opts :filter)
+                   (get (u/maybe-decode-cursor cursor-str) :filter))
+        data (if (not-empty filter)
+               (select-keys data filter)
                data)]
     (binding [*print-dup* false
               *print-meta* false
@@ -86,8 +91,9 @@
         (pos-int? (get opts :first))
         (pf/paginate-first data
                            (merge f-map
-                                  {:max-items  (get opts :first)
-                                   :keep?      filter
+                                  {:filter     filter
+                                   :max-items  (get opts :first)
+                                   :keep?      time-filter
                                    :context    context
                                    :sort-attrs sort-attrs})
                            cursor-str)
@@ -95,8 +101,9 @@
         (pos-int? (get opts :last))
         (pl/paginate-last data
                           (merge f-map
-                                 {:max-items  (get opts :last)
-                                  :keep?      filter
+                                 {:filter     filter
+                                  :max-items  (get opts :last)
+                                  :keep?      time-filter
                                   :context    context
                                   :sort-attrs sort-attrs})
                           cursor-str)

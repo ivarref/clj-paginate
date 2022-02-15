@@ -43,10 +43,7 @@
   :batch?: Set to true if f should be invoked once on all nodes,
            and not once for each node. If this is set to true,
            f must return the output nodes in the same order as the input nodes.
-           Defaults to false.
-
-  :auto-reset?: Whether to detect and automatically reset old cursors.
-                Defaults to false."
+           Defaults to false."
   [data sort-attrs f opts & {:keys [filter context batch?] :or {filter (constantly true) context {} batch? false}}]
   (assert (fn? f) "Expected f to be a function")
   (assert (fn? filter) "Expected keep? to be a function")

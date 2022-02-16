@@ -33,8 +33,8 @@
                            {:a/id 2}]
                           [{:b/id 2}
                            {:b/id 1}]
-                          :sif :a/id
-                          :dif :b/id))))
+                          :sf :a/id
+                          :df :b/id))))
 
 
 (deftest ensure-order-throws-test

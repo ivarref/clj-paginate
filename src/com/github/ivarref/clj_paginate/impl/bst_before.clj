@@ -7,15 +7,14 @@
 (defn init-vector [v]
   [v 0 (count v)])
 
-(defn contains-index [^IPersistentVector v idx keep?]
+(defn contains-index [^IPersistentVector v idx]
   (when (and (< idx (count ^IPersistentVector v))
-             (>= idx 0)
-             (keep? (nth ^IPersistentVector v idx)))
+             (>= idx 0))
     idx))
 
 
 (defn before-value-index
-  [keep? find-value sort-fn [v start end]]
+  [find-value sort-fn [v start end]]
   (if (>= start end)
     (if (and (= start end)
              (= end (count v)))
@@ -25,18 +24,18 @@
           curr-val (nth v mid)
           cmp-int (compare (sort-fn find-value) (sort-fn curr-val))]
       (cond (= 0 cmp-int)
-            (contains-index v (dec mid) keep?)
+            (contains-index v (dec mid))
 
             (neg-int? cmp-int)
-            (before-value-index keep? find-value sort-fn [v start mid])
+            (before-value-index find-value sort-fn [v start mid])
 
             :else
-            (or (before-value-index keep? find-value sort-fn [v (inc mid) end])
-                (contains-index v mid keep?))))))
+            (or (before-value-index find-value sort-fn [v (inc mid) end])
+                (contains-index v mid))))))
 
 (defrecord tmpres [v vidx idx])
 
-(defn before-value-take [^IPersistentVector vecs keep? sort-fn max-items starting-indexes]
+(defn before-value-take [^IPersistentVector vecs sort-fn max-items starting-indexes]
   (vec
     (reverse
       (loop [res (transient [])
@@ -52,29 +51,27 @@
                                      (if (nil? idx)
                                        (recur (inc vec-idx) res)
                                        (let [v (get-nth (get-nth vecs vec-idx) idx)]
-                                         (if (and (keep? v)
-                                                  (or (nil? res)
-                                                      (pos-int? (compare (sort-fn v) (sort-fn (.-v res))))))
+                                         (if (or (nil? res)
+                                                 (pos-int? (compare (sort-fn v) (sort-fn (.-v res)))))
                                            (recur (inc vec-idx) (tmpres. v vec-idx idx))
                                            (recur (inc vec-idx) res))))))))]
             (recur (conj! res (.-v v))
                    (assoc indexes (.-vidx v) (contains-index (get-nth vecs (.-vidx v))
-                                                             (dec (.-idx v))
-                                                             keep?)))
+                                                             (dec (.-idx v)))))
             (persistent! res)))))))
 
-(defn before-value [vecs keep? from-value sort-fn max-items]
+(defn before-value [vecs from-value sort-fn max-items]
   (->> vecs
        (mapv init-vector)
-       (mapv (partial before-value-index keep? from-value sort-fn))
-       (before-value-take vecs keep? sort-fn max-items)))
+       (mapv (partial before-value-index from-value sort-fn))
+       (before-value-take vecs sort-fn max-items)))
 
 (defn from-end
-  [vecs keep? sort-fn max-items]
-  (before-value-take vecs keep? sort-fn max-items (mapv (fn [v]
-                                                          (when (>= (count v) 1)
-                                                            (dec (count v))))
-                                                        vecs)))
+  [vecs sort-fn max-items]
+  (before-value-take vecs sort-fn max-items (mapv (fn [v]
+                                                    (when (>= (count v) 1)
+                                                      (dec (count v))))
+                                                  vecs)))
 
 (comment
   (before-value

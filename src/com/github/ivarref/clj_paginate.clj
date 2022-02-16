@@ -4,12 +4,6 @@
             [com.github.ivarref.clj-paginate.impl.utils :as u]))
 
 
-(defn get-context
-  "Gets the :context from a previous invocation of paginate as stored in :before or :after"
-  [opts]
-  (:context (u/get-cursor opts)))
-
-
 (defn paginate
   "Required parameters
   ===================
@@ -23,6 +17,10 @@
   f: Invoked on each node. Invoked once on all nodes if :batch? is true.
 
   opts: A map that should contain :first or :last, as well as optionally :after or :before.
+        Opts may also contain `:filter`, which, if present, should be a collection of
+        keys to filter the data map on. The filter value will be persisted in the cursor string,
+        and will be used on subsequent queries.
+
 
   Optional named parameters
   =========================
@@ -48,19 +46,20 @@
                 :totalCount Integer
                 :startCursor String
                 :endCursor String}}"
-  [data sort-attrs f opts & {:keys [time-filter context batch?]
-                             :or {time-filter (constantly true) context {} batch? false}}]
-  (assert (fn? time-filter) "Expected keep? to be a function")
+  [data sort-attrs f opts & {:keys [context batch?] :or {context {} batch? false}}]
   (assert (map? opts) "Expected opts to be a map")
   (let [f (if (keyword? f) (fn [node] (get node f)) f)
         _ (assert (fn? f) "Expected f to be a function")
-        f-map (if batch?
-                {:batch-f f}
-                {:f f})
-        cursor-str (or (get opts :after) (get opts :before))
         sort-attrs (if (keyword? sort-attrs)
                      [sort-attrs]
                      sort-attrs)
+        _ (assert (and (vector? sort-attrs)
+                       (every? keyword? sort-attrs))
+                  "Expected sort-attrs to be a single keyword or a vector of keywords")
+        f-map (if batch?
+                {:batch-f f}
+                {:f f})
+        cursor-str (or (get opts :after) (get opts :before) "")
         data (if (vector? data)
                {"default" data}
                data)
@@ -86,20 +85,11 @@
         (and (some? (get opts :last)) (some? (get opts :after)))
         (throw (ex-info ":last and :after given, please use :last with :before" {:opts opts}))
 
-        (empty? data)
-        {:edges    []
-         :pageInfo {:hasNextPage false
-                    :hasPrevPage false
-                    :startCursor (pr-str {:context context})
-                    :endCursor   (pr-str {:context context})
-                    :totalCount  0}}
-
         (pos-int? (get opts :first))
         (pf/paginate-first data
                            (merge f-map
                                   {:filter     filter
                                    :max-items  (get opts :first)
-                                   :keep?      time-filter
                                    :context    context
                                    :sort-attrs sort-attrs})
                            cursor-str)
@@ -109,7 +99,6 @@
                           (merge f-map
                                  {:filter     filter
                                   :max-items  (get opts :last)
-                                  :keep?      time-filter
                                   :context    context
                                   :sort-attrs sort-attrs})
                           cursor-str)
@@ -118,19 +107,20 @@
         (throw (ex-info "Bad opts given, expected either :first or :last to be a positive integer." {:opts opts}))))))
 
 
-(defn ensure-order [src-vec dst-vec & {:keys [sif dif] :or {sif :id dif :id}}]
+(defn ensure-order
+  [src-vec dst-vec & {:keys [sf df] :or {sf :id df :id}}]
   (assert (vector? src-vec) "src-vec must be a vector")
   (assert (vector? dst-vec) "dst-vec must be a vector")
   (let [ks (mapv (fn [node]
-                   (if-some [id (sif node)]
+                   (if-some [id (sf node)]
                      id
-                     (throw (ex-info "No key value for src node" {:sif sif :node node}))))
+                     (throw (ex-info "No key value for src node" {:sf sf :node node}))))
                  src-vec)
         m (persistent!
             (reduce (fn [o node]
-                      (assoc! o (if-some [id (dif node)]
+                      (assoc! o (if-some [id (df node)]
                                   id
-                                  (throw (ex-info "No key value for dst node" {:dif dif :node node}))) node))
+                                  (throw (ex-info "No key value for dst node" {:df df :node node}))) node))
                     (transient {})
                     dst-vec))]
     (persistent!
@@ -141,3 +131,9 @@
           (conj! res (get m k)))
         (transient [])
         ks))))
+
+
+(defn get-context
+  "Gets the :context from a previous invocation of paginate as stored in :before or :after"
+  [opts]
+  (:context (u/get-cursor opts)))

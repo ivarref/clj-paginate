@@ -156,29 +156,6 @@
     (is (false? (:hasNextPage conn)))))
 
 
-(deftest can-select-by-with-keep?-function
-  (let [conn (pagg2
-               (shuffle
-                 [{:inst :a1 :group :a}
-                  {:inst :a2 :group :a}
-                  {:inst :b1 :group :b}
-                  {:inst :b2 :group :b}])
-               [:inst]
-               {:first 10
-                :keep? #(= :a (:group %))})]
-    (is (= [:a1 :a2] @conn))
-    (is (= [] @conn))
-
-    (conn [{:inst :a1 :group :a}
-           {:inst :a2 :group :a}
-           {:inst :a3 :group :a}
-           {:inst :b1 :group :b}
-           {:inst :b2 :group :b}])
-
-    (is (= [:a3] @conn))
-    (is (= 3 (:totalCount conn)))))
-
-
 (deftest paginate-last-test
   (let [conn (pagg2
                [{:inst 1 :group :a}

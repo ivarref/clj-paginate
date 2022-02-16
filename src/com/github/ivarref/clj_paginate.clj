@@ -125,6 +125,13 @@
 
 
 (defn ensure-order
+  "Orders dst-vec according to src-vec.
+
+  Optional named parameters `sf and `df`
+  that defaults to `:id`.
+
+  (sf source-node) must be equal to some
+  (df dest-node) for one element in dst-vec."
   [src-vec dst-vec & {:keys [sf df] :or {sf :id df :id}}]
   (assert (vector? src-vec) "src-vec must be a vector")
   (assert (vector? dst-vec) "dst-vec must be a vector")

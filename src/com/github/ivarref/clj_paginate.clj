@@ -9,17 +9,32 @@
   ===================
   data: The data to paginate. Must be either a vector or a map with vectors as values.
         All vectors must be sorted according to `sort-attrs`.
-        Elements in the vectors must be maps.
+        The actual nodes in the vectors must be maps.
 
   sort-attrs: How the vectors in `data` is sorted.
               Should be a single keyword or a vector of keywords.
 
-  f: Invoked on each node. Invoked once on all nodes if :batch? is true.
+  f: Invoked on each node.
+     Invoked a single time on all nodes if :batch? is true.
 
-  opts: A map that should contain :first or :last, as well as optionally :after or :before.
+  opts: A map specifying what data is to be fetched.
+        It must contain either:
+        :first: an int specifying how many nodes to fetch,
+        starting at the beginning of the data.
+
+        Or:
+        :last: an int specifying how many nodes to fetch,
+        starting at the end of the data.
+
+        The cursor, i.e. where to continue fetching data from
+        on subsequent queries, should be given as a string
+        in :after if :first is used, or :before if :last is used.
+
         Opts may also contain `:filter`, which, if present, should be a collection of
-        keys to filter the data map on. The filter value will be persisted in the cursor string,
-        and will be used on subsequent queries.
+        keys to filter the data map on. The filter value will be persisted in
+        the cursor string, and will automatically be used on subsequent queries.
+        If `:filter` is not specified, no filtering is done.
+        Thus the default behaviour is to include everything.
 
 
   Optional named parameters
@@ -28,10 +43,12 @@
             Defaults to {}. Can be retrieved on subsequent queries using
             `(get-context ...)`.
 
-  :batch?: Set to true if f should be invoked once on all nodes,
+  :batch?: Set to true if f should be invoked a single time on all nodes,
            and not once for each node. If this is set to true,
            f must return the output nodes in the same order as the input nodes.
-           Defaults to false.
+           Please see the `ensure-order` function for a helper function
+           that makes sure the ordering is correct.
+           The default value of :batch? is false.
 
 
   Return value

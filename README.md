@@ -7,7 +7,7 @@ with vector or map as the backing data.
 Supports: 
 * Collections that grows and/or changes.
 * Long polling (`:first` only, not `:last`).
-* OR filtering (maps only).
+* Basic OR filtering (maps only).
 * Batching (optional).
 
 No external dependencies.
@@ -173,7 +173,7 @@ That is all that is needed for the basic use case to work.
 
 ## OR filters
 
-Sometimes you may want to provide a filtering of the data.
+Sometimes you may want to provide filtering of the data.
 This is done in two steps:
 
 1. Your HTTP endpoint must support a parameter that represents the or filter.
@@ -260,10 +260,10 @@ ordering as the input vector.  You may want to use the function
                           (shuffle))]
     (cp/ensure-order nodes 
                      loaded-nodes
-                     :sif :id ; Source id function, defaults to :id.
-                     :dif :db/id ; Dest id function, defaults to :id.
+                     :sf :id ; Source id function, defaults to :id.
+                     :df :db/id ; Dest id function, defaults to :id.
                      
-                     ; (sif input-node) must be equal to some (dif output-node).
+                     ; (sf input-node) must be equal to some (df output-node).
                      ; ensure-order uses this to order `loaded-nodes` according
                      ; to how `nodes` were ordered.
                      )))
@@ -272,7 +272,7 @@ ordering as the input vector.  You may want to use the function
 
 ## Performance
 
-`clj-paginate` treats the (sorted) input vectors as binary search trees,
+`clj-paginate` treats the (sorted) input vectors as binary trees,
 and thus the general performance is `O(log n)` for finding where to continue
 giving out data. When paginating over maps, this
 has to be multiplied by the number of selected keys.

@@ -281,6 +281,18 @@ Using `:first 1000` and 10 million dummy entries, the average
 overhead was about 1-5 ms per iteration on my machine. That is about
 1-5 microsecond per returned node.
 
+## Change log
+
+### 2022-02-16 0.2.51
+Initial release publicly announced.
+
+## Misc
+
+A few days after I made the initial announcement, I came across
+[java.util.NavigableSet](https://docs.oracle.com/javase/8/docs/api/java/util/NavigableSet.html)
+that looks like a perfect fit for doing pagination
+in JVM-land.
+
 ## License
 
 Copyright © 2022 Ivar Refsdal

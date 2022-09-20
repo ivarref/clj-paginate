@@ -8,11 +8,15 @@
   "Required parameters
   ===================
   data: The data to paginate. Must be either a vector or a map with vectors as values.
-        All vectors must be sorted according to `sort-attrs`.
+        All vectors must be sorted based on `node-id-attrs` or `:sort-fn`.
         The actual nodes in the vectors must be maps.
 
-  sort-attrs: How the vectors in `data` is sorted.
-              Should be a single keyword or a vector of keywords.
+  node-id-attrs: Attributes that gives a unique identifier of a node.
+                 Should be a single keyword or a vector of keywords.
+                 This value represents what attributes the vector is sorted by,
+                 but does not contain information about descending or ascending order.
+                 Evaluating `((apply juxt node-id-attrs) node)` must give a unique identifier for the node.
+                 This value will be stored in the cursor.
 
   f: Invoked on each node.
      Invoked a single time on all nodes if :batch? is true.
@@ -39,6 +43,13 @@
 
   Optional named parameters
   =========================
+  :sort-fn: Supply a custom sorting function for how the data was sorted.
+            This allows the data to be sorted descending based on some attribute,
+            e.g. you may pass `(juxt (comp - :foo) :bar)` for `:sort-fn`
+            while `:node-id-attrs` is given as `[:foo :bar]`.
+            Defaults to `(apply juxt node-id-attrs)`, i.e. ascending sorting
+            for all attributes.
+
   :context: User-defined data to store in every cursor. Must be pr-str-able.
             Defaults to {}. Can be retrieved on subsequent queries using
             `(get-context ...)`.
@@ -63,13 +74,14 @@
                 :totalCount Integer
                 :startCursor String
                 :endCursor String}}"
-  [data sort-attrs f opts & {:keys [context batch?] :or {context {} batch? false}}]
+  [data node-id-attrs f opts & {:keys [context batch? sort-fn] :or {context {} batch? false}}]
   (assert (map? opts) "Expected opts to be a map")
   (let [f (if (keyword? f) (fn [node] (get node f)) f)
         _ (assert (fn? f) "Expected f to be a function")
-        sort-attrs (if (keyword? sort-attrs)
-                     [sort-attrs]
-                     sort-attrs)
+        sort-attrs (if (keyword? node-id-attrs)
+                     [node-id-attrs]
+                     node-id-attrs)
+        sort-fn (if sort-fn sort-fn (apply juxt sort-attrs))
         _ (assert (and (vector? sort-attrs)
                        (every? keyword? sort-attrs))
                   "Expected sort-attrs to be a single keyword or a vector of keywords")
@@ -77,9 +89,12 @@
                 {:batch-f f}
                 {:f f})
         cursor-str (or (get opts :after) (get opts :before) "")
-        data (if (vector? data)
+        data (cond
+               (vector? data)
                {"default" data}
-               data)
+               (and (map? data) (every? vector? (vals data)))
+               data
+               :else (throw (ex-info "Unsupported data type" {:data data})))
         filter (when-let [filter (not-empty (or (get opts :filter)
                                                 (get (u/maybe-decode-cursor cursor-str) :filter)))]
                  (vec (distinct filter)))
@@ -108,7 +123,8 @@
                                   {:filter     filter
                                    :max-items  (get opts :first)
                                    :context    context
-                                   :sort-attrs sort-attrs})
+                                   :sort-attrs sort-attrs
+                                   :sort-fn    sort-fn})
                            cursor-str)
 
         (pos-int? (get opts :last))
@@ -117,7 +133,8 @@
                                  {:filter     filter
                                   :max-items  (get opts :last)
                                   :context    context
-                                  :sort-attrs sort-attrs})
+                                  :sort-attrs sort-attrs
+                                  :sort-fn    sort-fn})
                           cursor-str)
 
         :else

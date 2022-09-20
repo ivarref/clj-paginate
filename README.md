@@ -51,8 +51,11 @@ particularly the fact that the desired response looks like the following:
            {:inst 2}])
 
 ; Get the initial page:
-(def page-1 (cp/paginate data 
-                         :inst ; sort-attrs: Specifies how `data` is sorted.
+(def page-1 (cp/paginate data ; The data *must* already be sorted before being passed to cp/paginate.
+                         :inst ; node-id-attrs: Specifies how to get a unique identifier for a node.
+                               ;                This value represents what attributes the vector is sorted by,
+                               ;                but does not contain information about descending or ascending order.
+                               ;                This value is stored in the cursor.
                          identity ; A function to transform an initial node into a final node,
                                   ; i.e. load more data from a database.
                          {:first 2}))
@@ -131,7 +134,7 @@ paginated.
 ## Data requirements
 
 1. Nodes must be maps.
-2. Vectors passed to `paginate` must be sorted according to `sort-attrs`.
+2. Vectors passed to `paginate` *must* be sorted.
 
 ## Basic use case example
 
@@ -149,9 +152,10 @@ paginated.
     :status 200
     :body (cp/paginate
             ; The first argument is the data to paginate.
+            ; The data must already be sorted.
             data
             
-            ; The second argument specifies how the data was sorted.
+            ; The second argument specifies which attributes constitute a unique identifier for a node.
             ; It may be a single keyword, or a vector of keywords.
             [:inst]
             
@@ -170,6 +174,61 @@ paginated.
 ```
 
 That is all that is needed for the basic use case to work.
+
+## Descending values example
+
+The default behaviour of `clj-paginate` is to assume that all attributes in `:node-id-attrs` is sorted ascending.
+That is to say that the default `:sort-fn` is `(apply juxt :node-id-attrs)`.
+It's possible to override this, and thus support descending values:
+
+```clojure
+(require '[com.github.ivarref.clj-paginate :as cp])
+
+(def data 
+  ; The data have descending values. 
+  [{:inst 2 :id 3}
+   {:inst 1 :id 2}
+   {:inst 0 :id 1}])
+
+(cp/paginate
+   ; The first argument is the data to paginate.
+   ; The data must be sorted.
+   data
+   
+   ; The second argument specifies which attributes constitute a unique identifier for a node.
+   ; It may be a single keyword, or a vector of keywords.
+   [:inst]
+   
+   identity
+   {:first 2}
+   
+   ; sort-fn tells how the data is sorted.
+   ; clj-paginate will use this to effectively navigate to the next/previous value.
+   ; sort-fn defaults to `(apply juxt node-id-attrs)`.
+   :sort-fn (juxt (comp - :inst)))
+
+(def conn *1)
+
+(mapv :node (:edges conn))
+=> [{:inst 2, :id 3} {:inst 1, :id 2}]
+
+(cp/paginate
+   ; The first argument is the data to paginate.
+   ; The data must already be sorted.
+   data
+
+   ; The second argument specifies which attributes constitute a unique identifier for a node.
+   ; It may be a single keyword, or a vector of keywords.
+   [:inst]
+
+   identity
+   {:first 2 :after (get-in conn [:pageInfo :endCursor])}
+
+   :sort-fn (juxt (comp - :inst)))
+
+(mapv :node (:edges *1))
+=> [{:inst 0, :id 1}]
+```
 
 ## OR filters
 
@@ -280,6 +339,21 @@ has to be multiplied by the number of selected keys.
 Using `:first 1000` and 10 million dummy entries, the average
 overhead was about 1-5 ms per iteration on my machine. That is about
 1-5 microsecond per returned node.
+
+## Change log
+
+### 2022-09-20 0.2.52
+Support descending values.
+
+### 2022-02-16 0.2.51
+Initial release publicly announced.
+
+## Misc
+
+A few days after I made the initial announcement, I came across
+[java.util.NavigableSet](https://docs.oracle.com/javase/8/docs/api/java/util/NavigableSet.html)
+that looks like a perfect fit for doing pagination
+in JVM-land.
 
 ## License
 

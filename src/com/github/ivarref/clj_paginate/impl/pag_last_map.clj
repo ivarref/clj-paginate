@@ -9,7 +9,8 @@
                              batch-f
                              sort-attrs
                              filter
-                             context]
+                             context
+                             sort-fn]
                       :or   {f       identity
                              batch-f identity
                              context nil}}
@@ -19,9 +20,13 @@
         cursor (-> (merge {:context context}
                           (when filter {:filter filter})
                           decoded-cursor))
-        sort-fn (apply juxt sort-attrs)
+        sort-fn (if sort-fn sort-fn (apply juxt sort-attrs))
         nodes-plus-1 (if-let [from-value (get cursor :cursor)]
-                       (bst/before-value vecs (zipmap sort-attrs from-value) sort-fn (inc max-items))
+                       (do
+                         (when (not= (count from-value) (count sort-attrs))
+                           (throw (ex-info "Mismatch in size of :node-id-attrs and :cursor" {:node-id-attrs sort-attrs
+                                                                                             :cursor from-value})))
+                         (bst/before-value vecs (zipmap sort-attrs from-value) sort-fn (inc max-items)))
                        (bst/from-end vecs sort-fn (inc max-items)))
         edges (u/get-edges (take-last max-items nodes-plus-1) batch-f f sort-attrs cursor)
         hasPrevPage (or (when (not-empty nodes-plus-1)

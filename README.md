@@ -51,14 +51,27 @@ particularly the fact that the desired response looks like the following:
            {:inst 2}])
 
 ; Get the initial page:
-(def page-1 (cp/paginate data ; The data *must* already be sorted before being passed to cp/paginate.
-                         :inst ; node-id-attrs: Specifies how to get a unique identifier for a node.
-                               ;                This value represents what attributes the vector is sorted by,
-                               ;                but does not contain information about descending or ascending order.
-                               ;                This value is stored in the cursor.
-                         identity ; A function to transform an initial node into a final node,
-                                  ; i.e. load more data from a database.
-                         {:first 2}))
+(def page-1 (cp/paginate 
+               ; The data *must* already be sorted before being passed to cp/paginate.
+               data
+               
+               ; The next argument, `node-id-attrs`, specifies 
+               ; how to get a unique identifier for a node.
+               ; It *must* also include all attributes that is used for sorting the vector.
+               ; The resulting value of `((apply juxt node-id-attrs) node)` 
+               ; is stored in the cursor, and is used on subsequent requests
+               ; to recreate the starting node for the next page.
+               ; It must be a single keyword or a vector of keywords.
+               ; See more documentation below for information about ascending or descending
+               ; sorting.
+               :inst
+               
+               ; A function to transform an initial node into a final node,
+               ; i.e. load more data from a database.
+               identity
+               
+               ; What to get, the first two elements in this case:
+               {:first 2}))
 ; page-1
 ;=>
 ;{:edges
@@ -177,7 +190,7 @@ That is all that is needed for the basic use case to work.
 
 ## Descending values example
 
-The default behaviour of `clj-paginate` is to assume that all attributes in `:node-id-attrs` is sorted ascending.
+The default behaviour of `clj-paginate` is to assume that all attributes in `:node-id-attrs` is sorted ascendingly.
 That is to say that the default `:sort-fn` is `(apply juxt :node-id-attrs)`.
 It's possible to override this, and thus support descending values:
 
@@ -185,7 +198,7 @@ It's possible to override this, and thus support descending values:
 (require '[com.github.ivarref.clj-paginate :as cp])
 
 (def data 
-  ; The data have descending values. 
+  ; The data has descending values. 
   [{:inst 2 :id 3}
    {:inst 1 :id 2}
    {:inst 0 :id 1}])
@@ -196,6 +209,7 @@ It's possible to override this, and thus support descending values:
    data
    
    ; The second argument specifies which attributes constitute a unique identifier for a node.
+   ; It must also contain all the attributes that is used to sort the data.
    ; It may be a single keyword, or a vector of keywords.
    [:inst]
    
@@ -341,6 +355,10 @@ overhead was about 1-5 ms per iteration on my machine. That is about
 1-5 microsecond per returned node.
 
 ## Change log
+
+
+### 2022-09-23 0.2.53
+Bugfix. Values for `pageInfo.hasPrevPage` and `pageInfo.hasNextPage` for `last/before` pagination were reversed. Thanks [@kthu](https://github.com/kthu)!
 
 ### 2022-09-20 0.2.52
 Support descending values.

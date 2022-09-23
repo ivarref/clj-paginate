@@ -165,20 +165,20 @@
                [:inst :group]
                {:last 3})]
     (is (= [2 3 4] @conn))
+    (is (true? (:hasPrevPage conn)))
+    (is (false? (:hasNextPage conn)))
+
+    (is (= [1] @conn))
     (is (false? (:hasPrevPage conn)))
     (is (true? (:hasNextPage conn)))
 
-    (is (= [1] @conn))
-    (is (true? (:hasPrevPage conn)))
-    (is (false? (:hasNextPage conn)))
+    (is (= [] @conn))
+    (is (false? (:hasPrevPage conn)))
+    (is (true? (:hasNextPage conn)))
 
     (is (= [] @conn))
-    (is (true? (:hasPrevPage conn)))
-    (is (false? (:hasNextPage conn)))
-
-    (is (= [] @conn))
-    (is (true? (:hasPrevPage conn)))
-    (is (false? (:hasNextPage conn)))
+    (is (false? (:hasPrevPage conn)))
+    (is (true? (:hasNextPage conn)))
 
     (conn [{:inst 1 :group :a}
            {:inst 2 :group :a}

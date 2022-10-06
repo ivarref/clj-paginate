@@ -14,7 +14,7 @@
 
 
 (defn before-value-index
-  [find-value sort-fn [v start end]]
+  [find-value compare-fn inclusive? [v start end]]
   (if (>= start end)
     (if (and (= start end)
              (= end (count v)))
@@ -22,20 +22,20 @@
       nil)
     (let [mid (int (/ (+ start end) 2))
           curr-val (nth v mid)
-          cmp-int (compare (sort-fn find-value) (sort-fn curr-val))]
+          cmp-int (compare-fn find-value curr-val)]
       (cond (= 0 cmp-int)
-            (contains-index v (dec mid))
+            (contains-index v (if inclusive? mid (dec mid)))
 
             (neg-int? cmp-int)
-            (before-value-index find-value sort-fn [v start mid])
+            (before-value-index find-value compare-fn inclusive? [v start mid])
 
             :else
-            (or (before-value-index find-value sort-fn [v (inc mid) end])
+            (or (before-value-index find-value compare-fn inclusive? [v (inc mid) end])
                 (contains-index v mid))))))
 
 (defrecord tmpres [v vidx idx])
 
-(defn before-value-take [^IPersistentVector vecs sort-fn max-items starting-indexes]
+(defn before-value-take [^IPersistentVector vecs compare-fn max-items starting-indexes]
   (vec
     (reverse
       (loop [res (transient [])
@@ -52,7 +52,7 @@
                                        (recur (inc vec-idx) res)
                                        (let [v (get-nth (get-nth vecs vec-idx) idx)]
                                          (if (or (nil? res)
-                                                 (pos-int? (compare (sort-fn v) (sort-fn (.-v res)))))
+                                                 (pos-int? (compare-fn v (.-v res))))
                                            (recur (inc vec-idx) (tmpres. v vec-idx idx))
                                            (recur (inc vec-idx) res))))))))]
             (recur (conj! res (.-v v))
@@ -60,41 +60,15 @@
                                                              (dec (.-idx v)))))
             (persistent! res)))))))
 
-(defn before-value [vecs from-value sort-fn max-items]
+(defn before-value [vecs from-value compare-fn max-items inclusive?]
   (->> vecs
        (mapv init-vector)
-       (mapv (partial before-value-index from-value sort-fn))
-       (before-value-take vecs sort-fn max-items)))
+       (mapv (partial before-value-index from-value compare-fn inclusive?))
+       (before-value-take vecs compare-fn max-items)))
 
 (defn from-end
-  [vecs sort-fn max-items]
-  (before-value-take vecs sort-fn max-items (mapv (fn [v]
-                                                    (when (>= (count v) 1)
-                                                      (dec (count v))))
-                                                  vecs)))
-
-(comment
-  (before-value
-    [[0 2 4 6]
-     [1 3 5 7]]
-    (constantly true)
-    100
-    identity
-    3))
-
-(comment
-  (from-end [[1 2 3 4 5]]
-            (constantly true)
-            identity
-            3))
-
-(comment
-  (let [v [0 1 2 3 4 5 6 7 8 9]
-        start-index (before-value-index
-                      (constantly true)
-                      0
-                      identity
-                      (init-vector v))]
-    (println "start-index: " start-index)
-    (when start-index
-      (println "value:" (nth v start-index)))))
+  [vecs compare-fn max-items]
+  (before-value-take vecs compare-fn max-items (mapv (fn [v]
+                                                       (when (>= (count v) 1)
+                                                         (dec (count v))))
+                                                     vecs)))

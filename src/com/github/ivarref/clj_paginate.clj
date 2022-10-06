@@ -3,20 +3,57 @@
             [com.github.ivarref.clj-paginate.impl.pag-last-map :as pl]
             [com.github.ivarref.clj-paginate.impl.utils :as u]))
 
+(defn compare-fn
+  "Takes a vector of pairs as input.
+  For example: `[[:id :asc] [:date :desc]]`.
+
+  It also accepts a single keyword as input. This will be transformed to [[:keyword :asc]].
+
+  It also accepts a vector of keywords as input. This will be transformed to [[:kw1 :asc] [:kw2 :asc]].
+
+  Returns a function that can be used to sort a collection, e.g:
+  `(into [] (sort (compare-fn [[:id :asc] [:date :desc]]) my-vector))`"
+  [sort-attrs]
+  (let [sort-attrs (->> (if (keyword? sort-attrs)
+                          [sort-attrs]
+                          sort-attrs)
+                        (mapv (fn [kw-or-pair]
+                                (if (keyword? kw-or-pair)
+                                  [kw-or-pair :asc]
+                                  kw-or-pair))))]
+    (if
+      (every? vector? sort-attrs)
+      (do
+        (doseq [[attr order] sort-attrs]
+          (when-not (contains? #{:asc :desc} order)
+            (throw (ex-info (str "Order must be either :asc or :desc for attribute: " attr) {}))))
+        (fn [a b]
+          (reduce (fn [_ [attr order]]
+                    (let [a-attr (get a attr)
+                          b-attr (get b attr)
+                          r (if (= order :asc)
+                              (compare a-attr b-attr)
+                              (compare b-attr a-attr))]
+                      (if (= r 0)
+                        0
+                        (reduced r))))
+                  0
+                  sort-attrs)))
+      (throw (ex-info (str "Unsupported format for sort-attrs. Given: " sort-attrs) {:sort-attrs sort-attrs})))))
 
 (defn paginate
   "Required parameters
-  ===================
+  ====================
   data: The data to paginate. Must be either a vector or a map with vectors as values.
         All vectors must be sorted based on `node-id-attrs` or `:sort-fn`.
         The actual nodes in the vectors must be maps.
 
-  node-id-attrs: Attributes that gives a unique identifier of a node.
-                 Should be a single keyword or a vector of keywords.
-                 This value represents what attributes the vector is sorted by,
-                 but does not contain information about descending or ascending order.
-                 Evaluating `((apply juxt node-id-attrs) node)` must give a unique identifier for the node.
-                 This value will be stored in the cursor.
+  sort-attrs: Attributes that specifies how the vector is sorted.
+              It can be:
+              * a single keyword. clj-paginate will assume ascending sorting.
+              * a vector of keywords. clj-paginate will assume ascending sorting.
+              * a vector of pairs. A pair must contain the keyword and :asc or :desc.
+                Example: [[:id :asc] [:date :desc]].
 
   f: Invoked on each node.
      Invoked a single time on all nodes if :batch? is true.
@@ -49,6 +86,7 @@
             while `:node-id-attrs` is given as `[:foo :bar]`.
             Defaults to `(apply juxt node-id-attrs)`, i.e. ascending sorting
             for all attributes.
+            Deprecated in favor of using `sort-attrs` e.g. [[:foo :desc] [:bar :asc]].
 
   :context: User-defined data to store in every cursor. Must be pr-str-able.
             Defaults to {}. Can be retrieved on subsequent queries using
@@ -61,6 +99,15 @@
            that makes sure the ordering is correct.
            The default value of :batch? is false.
 
+  :inclusive?: Set to true if the result should include the node pointed to by the cursor.
+               This is useful if you want to check for updates to a given page only based on
+               a previous pageInfo.
+               The default value of :inclusive? is false.
+
+  :sort?: Set to `false` if you do not want clj-paginate to sort the vector(s) before doing anything.
+          If set to `false` this will speed up processing, but of course requires that the data
+          is already sorted.
+          Defaults to `true`.
 
   Return value
   ============
@@ -74,14 +121,20 @@
                 :totalCount Integer
                 :startCursor String
                 :endCursor String}}"
-  [data node-id-attrs f opts & {:keys [context batch? sort-fn] :or {context {} batch? false}}]
+  [data sort-attrs f opts & {:keys [context batch? sort-fn inclusive? sort?] :or {context {} batch? false inclusive? false sort? true}}]
   (assert (map? opts) "Expected opts to be a map")
   (let [f (if (keyword? f) (fn [node] (get node f)) f)
         _ (assert (fn? f) "Expected f to be a function")
-        sort-attrs (if (keyword? node-id-attrs)
-                     [node-id-attrs]
-                     node-id-attrs)
+        sort-attrs (if (keyword? sort-attrs)
+                     [sort-attrs]
+                     sort-attrs)
+        cmp-fn (if sort-fn
+                 #(compare (sort-fn %1) (sort-fn %2))
+                 (compare-fn sort-attrs))
         sort-fn (if sort-fn sort-fn (apply juxt sort-attrs))
+        sort-attrs (if (every? vector? sort-attrs)
+                     (mapv first sort-attrs)
+                     sort-attrs)
         _ (assert (and (vector? sort-attrs)
                        (every? keyword? sort-attrs))
                   "Expected sort-attrs to be a single keyword or a vector of keywords")
@@ -95,6 +148,12 @@
                (and (map? data) (every? vector? (vals data)))
                data
                :else (throw (ex-info "Unsupported data type" {:data data})))
+        data (if sort?
+               (reduce-kv (fn [o k v]
+                            (assoc o k (into [] (sort cmp-fn v))))
+                          {}
+                          data)
+               data)
         filter (when-let [filter (not-empty (or (get opts :filter)
                                                 (get (u/maybe-decode-cursor cursor-str) :filter)))]
                  (vec (distinct filter)))
@@ -124,7 +183,9 @@
                                    :max-items  (get opts :first)
                                    :context    context
                                    :sort-attrs sort-attrs
-                                   :sort-fn    sort-fn})
+                                   :sort-fn    sort-fn
+                                   :inclusive? inclusive?
+                                   :compare-fn cmp-fn})
                            cursor-str)
 
         (pos-int? (get opts :last))
@@ -134,7 +195,9 @@
                                   :max-items  (get opts :last)
                                   :context    context
                                   :sort-attrs sort-attrs
-                                  :sort-fn    sort-fn})
+                                  :sort-fn    sort-fn
+                                  :inclusive? inclusive?
+                                  :compare-fn cmp-fn})
                           cursor-str)
 
         :else

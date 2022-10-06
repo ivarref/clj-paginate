@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [[ $# -ne 1 ]]; then
+    echo "Illegal number of parameters" >&2
+    exit 2
+fi
+
 set -ex
 
 git update-index --refresh
@@ -18,17 +23,14 @@ MSG="$(git log --format=%B --reverse HEAD..HEAD@{1})"
 git commit -m"$MSG"
 
 VERSION="$(clojure -X:release ivarref.pom-patch/set-patch-version! :patch :commit-count)"
-echo "Releasing $VERSION"
-sed -i "s/HEAD/v$VERSION/g" ./README.md
+echo "Releasing $VERSION: $1"
 git add pom.xml README.md
 git commit -m "Release $VERSION"
 git reset --soft HEAD~2
-git commit -m"Release $VERSION
-$MSG"
+git commit -m"Release v$VERSION: $1"
 
-git tag -a v"$VERSION" -m "Release v$VERSION
-$MSG"
+git tag -a v"$VERSION" -m "Release v$VERSION: $1"
 git push --follow-tags --force
 
 clojure -X:deploy
-echo "Released $VERSION"
+echo "Released $VERSION: $1"

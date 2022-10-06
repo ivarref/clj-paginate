@@ -7,6 +7,8 @@ with vector or map as the backing data.
 Supports: 
 * Collections that grows and/or changes.
 * Long polling (`:first` only, not `:last`).
+* Multiple sort criteria.
+* Ascending or descending sorting.
 * Basic OR filtering (maps only).
 * Batching (optional).
 
@@ -46,22 +48,16 @@ particularly the fact that the desired response looks like the following:
        :edges
        (mapv :node)))
 
-(def data [{:inst 0}
-           {:inst 1}
-           {:inst 2}])
+(def data (vec (shuffle [{:inst 0}
+                         {:inst 1}
+                         {:inst 2}])))
 
 ; Get the initial page:
 (def page-1 (cp/paginate 
-               ; The data *must* already be sorted before being passed to cp/paginate.
                data
                
-               ; The next argument, `node-id-attrs`, specifies 
-               ; how to get a unique identifier for a node.
-               ; It *must* also include all attributes that is used for sorting the vector.
-               ; The resulting value of `((apply juxt node-id-attrs) node)` 
-               ; is stored in the cursor, and is used on subsequent requests
-               ; to recreate the starting node for the next page.
-               ; It must be a single keyword or a vector of keywords.
+               ; The next argument, `sort-attrs`, specifies how the vector should be sorted. 
+               ; It must be a single keyword, a vector of keywords or a vector of pairs (keyword and :asc/:desc).
                ; See more documentation below for information about ascending or descending
                ; sorting.
                :inst
@@ -146,18 +142,17 @@ paginated.
 
 ## Data requirements
 
-1. Nodes must be maps.
-2. Vectors passed to `paginate` *must* be sorted.
+Nodes must be maps.
 
 ## Basic use case example
 
 ```clojure
 (require '[com.github.ivarref.clj-paginate :as cp])
 
-(def data 
-  [{:inst 0 :id 1}
-   {:inst 1 :id 2}
-   {:inst 2 :id 3}])
+(def data
+  (vec (shuffle [{:inst 0 :id 1}
+                 {:inst 1 :id 2}
+                 {:inst 2 :id 3}])))
 
 (defn http-post-handler 
   [response data http-body]
@@ -165,11 +160,12 @@ paginated.
     :status 200
     :body (cp/paginate
             ; The first argument is the data to paginate.
-            ; The data must already be sorted.
             data
             
-            ; The second argument specifies which attributes constitute a unique identifier for a node.
-            ; It may be a single keyword, or a vector of keywords.
+            ; The second argument specifies how the vector is sorted.
+            ; It thus also specifies what constitute a unique identifier for a node.
+            ; It may be a single keyword, a vector of keywords,
+            ; or a vector of pairs where each pair has a keyword and :asc or :desc.
             [:inst]
             
             ; The third argument is a function that further processes the node.
@@ -188,43 +184,33 @@ paginated.
 
 That is all that is needed for the basic use case to work.
 
-## Descending values example
+## Multiple sort criteria and descending values example
 
-The default behaviour of `clj-paginate` is to assume that all attributes in `:node-id-attrs` is sorted ascendingly.
-That is to say that the default `:sort-fn` is `(apply juxt :node-id-attrs)`.
-It's possible to override this, and thus support descending values:
+The default behaviour of `clj-paginate` is to assume that all attributes in `:sort-attrs` is sorted ascendingly.
+It's possible to override this behaviour using pairs of `keyword :asc/:desc` in the `:sort-attrs` vector:
 
 ```clojure
 (require '[com.github.ivarref.clj-paginate :as cp])
 
-(def data 
-  ; The data has descending values. 
-  [{:inst 2 :id 3}
-   {:inst 1 :id 2}
-   {:inst 0 :id 1}])
+(def data
+  (vec (shuffle [{:inst #inst"2000" :id 1}
+                 {:inst #inst"2000" :id 2}
+                 {:inst #inst"2001" :id 3}])))
 
 (cp/paginate
    ; The first argument is the data to paginate.
-   ; The data must be sorted.
    data
    
-   ; The second argument specifies which attributes constitute a unique identifier for a node.
-   ; It must also contain all the attributes that is used to sort the data.
-   ; It may be a single keyword, or a vector of keywords.
-   [:inst]
+   ; The second argument specifies how the vector should be sorted.
+   [[:inst :asc] [:id :desc]]
    
    identity
-   {:first 2}
-   
-   ; sort-fn tells how the data is sorted.
-   ; clj-paginate will use this to effectively navigate to the next/previous value.
-   ; sort-fn defaults to `(apply juxt node-id-attrs)`.
-   :sort-fn (juxt (comp - :inst)))
+   {:first 2})
 
 (def conn *1)
 
 (mapv :node (:edges conn))
-=> [{:inst 2, :id 3} {:inst 1, :id 2}]
+=> [{:inst #inst"2000", :id 2} {:inst #inst"2000", :id 1}]
 
 (cp/paginate
    ; The first argument is the data to paginate.
@@ -233,15 +219,13 @@ It's possible to override this, and thus support descending values:
 
    ; The second argument specifies which attributes constitute a unique identifier for a node.
    ; It may be a single keyword, or a vector of keywords.
-   [:inst]
+   [[:inst :asc] [:id :desc]]
 
    identity
-   {:first 2 :after (get-in conn [:pageInfo :endCursor])}
-
-   :sort-fn (juxt (comp - :inst)))
+   {:first 2 :after (get-in conn [:pageInfo :endCursor])})
 
 (mapv :node (:edges *1))
-=> [{:inst 0, :id 1}]
+=> [{:inst #inst"2001", :id 3}]
 ```
 
 ## OR filters
@@ -314,10 +298,38 @@ already includes `:filter`, and thus it is not necessary to re-send
 this information on every request. If `:filter` is not specified for
 a map, every key is included.
 
+### Refresh a page
+
+If you want to refresh a page, you may add `:inclusive? true` as
+a named parameter when calling `paginate`.
+The results will then include the given cursor. This is useful
+if you want to check for updates of a given page only based on a
+previous pageInfo.
+
+```clojure
+(require '[com.github.ivarref.clj-paginate :as cp])
+
+; Using :first:
+(cp/paginate
+  data
+  [:sort-attrs]
+  identity
+  {:first 10 :after (:startCursor (:pageInfo connection))}
+  :inclusive? true)
+
+; Using :last:
+(cp/paginate
+   data
+   [:sort-attrs]
+   identity
+   {:last 10 :before (:endCursor (:pageInfo connection))}
+   :inclusive? true)
+```
+
 ### Batching
 
 Batching is supported. Add `:batch? true` when calling `paginate`.
-`f` must now accept a vector of nodes, and return 
+`f`, the third parameter to paginate, must now accept a vector of nodes, and return 
 a vector of processed nodes. The returned vector must have the same
 ordering as the input vector.  You may want to use the function
 `ensure-order` to make sure the order is correct:
@@ -326,10 +338,12 @@ ordering as the input vector.  You may want to use the function
 (require '[com.github.ivarref.clj-paginate :as cp])
 
 (defn load-batch [nodes]
-  (let [loaded-nodes (->> nodes
-                          ; Pretend to load data from the database:
-                          (mapv #(assoc % :db/id (:id %)))
-                          ; We got the ordering mixed up:
+  (let [loaded-nodes (->> (mapv :id nodes)
+                          
+                          ; load data from database using pull-many:
+                          (datomic.api/pull-many datomic-db '[:*])
+
+                          ; Do we have any ordering guarantees? Pretend the ordering got mixed up:
                           (shuffle))]
     (cp/ensure-order nodes 
                      loaded-nodes
@@ -340,6 +354,17 @@ ordering as the input vector.  You may want to use the function
                      ; ensure-order uses this to order `loaded-nodes` according
                      ; to how `nodes` were ordered.
                      )))
+
+; Using load-batch
+(cp/paginate
+   data
+   :id
+   load-batch
+   {:first 100}
+   
+   ; The named parameter :batch? is set to `true`:
+   :batch? true
+   )
 ```
 
 
@@ -356,6 +381,10 @@ overhead was about 1-5 ms per iteration on my machine. That is about
 
 ## Change log
 
+### 2022-10-06 0.3.54
+
+Add support for `inclusive?`, multiple sort criteria with `:asc` or `:desc`.
+Added named parameter `sort?` which defaults to `true`.
 
 ### 2022-09-23 0.2.53
 Bugfix. Values for `pageInfo.hasPrevPage` and `pageInfo.hasNextPage` for `last/before` pagination were reversed. Thanks [@kthu](https://github.com/kthu)!

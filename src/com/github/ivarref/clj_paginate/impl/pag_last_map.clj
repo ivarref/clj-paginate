@@ -10,7 +10,9 @@
                              sort-attrs
                              filter
                              context
-                             sort-fn]
+                             sort-fn
+                             inclusive?
+                             compare-fn]
                       :or   {f       identity
                              batch-f identity
                              context nil}}
@@ -21,19 +23,20 @@
                           (when filter {:filter filter})
                           decoded-cursor))
         sort-fn (if sort-fn sort-fn (apply juxt sort-attrs))
+        compare-fn (if compare-fn compare-fn #(compare (sort-fn %1) (sort-fn %2)))
         nodes-plus-1 (if-let [from-value (get cursor :cursor)]
                        (do
                          (when (not= (count from-value) (count sort-attrs))
                            (throw (ex-info "Mismatch in size of :node-id-attrs and :cursor" {:node-id-attrs sort-attrs
                                                                                              :cursor        from-value})))
-                         (bst/before-value vecs (zipmap sort-attrs from-value) sort-fn (inc max-items)))
-                       (bst/from-end vecs sort-fn (inc max-items)))
+                         (bst/before-value vecs (zipmap sort-attrs from-value) compare-fn (inc max-items) inclusive?))
+                       (bst/from-end vecs compare-fn (inc max-items)))
         edges (u/get-edges (take-last max-items nodes-plus-1) batch-f f sort-attrs cursor)]
     {:edges    edges
      :pageInfo {:hasPrevPage (> (count nodes-plus-1) max-items)
                 :hasNextPage (or (when (not-empty nodes-plus-1)
                                    (not= (last nodes-plus-1)
-                                         (first (bst/from-end vecs sort-fn 1))))
+                                         (first (bst/from-end vecs compare-fn 1))))
                                  (and (empty? nodes-plus-1)
                                       (some? cursor-str)))
                 :startCursor (or (get (first edges) :cursor) cursor-str)
